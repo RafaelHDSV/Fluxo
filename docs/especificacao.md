@@ -67,6 +67,7 @@ Configure `frontend/.env` e `backend/.env` a partir dos `.env.example` (projeto 
 |---------|-----|
 | `docs/context.md` | Stack, portas, decisoes fixas |
 | `docs/DESIGN.md` | Identidade visual |
+| `docs/superpowers/specs/2026-08-02-notion-fluxo-gap-analysis.md` | Diagnóstico Notion → Fluxo (gaps, mapa de campos, backlog P0–P3) |
 | Este arquivo | Objetivo, escopo, link da epic |
 
 ---
