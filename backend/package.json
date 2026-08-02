@@ -7,17 +7,22 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "test": "tsx src/modules/imports/parsers.test.ts",
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.111.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^5.1.0",
+    "jose": "^6.2.7",
+    "multer": "^2.2.0",
     "pg": "^8.14.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
+    "@types/multer": "^2.2.0",
     "@types/node": "^22.13.10",
     "@types/pg": "^8.11.11",
     "prettier": "^3.6.2",

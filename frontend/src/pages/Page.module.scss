@@ -1,0 +1,153 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+
+  h1 {
+    font-size: clamp(1.6rem, 2vw, 2rem);
+  }
+
+  p {
+    margin: 0.35rem 0 0;
+    color: var(--muted-foreground);
+  }
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--muted-foreground);
+}
+
+input,
+select,
+textarea {
+  border: 1px solid var(--border);
+  background: var(--muted);
+  color: var(--foreground);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.7rem;
+}
+
+.button,
+button.primary {
+  border: none;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.9rem;
+  font-weight: 600;
+}
+
+button.ghost {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--foreground);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.75rem;
+}
+
+button.danger {
+  border: 1px solid rgba(240, 113, 120, 0.5);
+  background: transparent;
+  color: var(--destructive);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.75rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.65rem 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+
+.error {
+  color: var(--destructive);
+}
+
+.alert {
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.alertWarning {
+  background: rgba(230, 180, 80, 0.12);
+  color: var(--warning);
+}
+
+.alertDanger {
+  background: rgba(240, 113, 120, 0.12);
+  color: var(--destructive);
+}
+
+.progress {
+  height: 8px;
+  background: var(--muted);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 0.45rem;
+
+  span {
+    display: block;
+    height: 100%;
+    background: var(--primary);
+  }
+}
+
+.empty {
+  color: var(--muted-foreground);
+  padding: 1.5rem 0;
+}
+
+@media (max-width: 900px) {
+  .charts {
+    grid-template-columns: 1fr;
+  }
+}

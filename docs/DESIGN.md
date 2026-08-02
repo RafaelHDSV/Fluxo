@@ -1,131 +1,95 @@
-# DESIGN — [Product name]
+# DESIGN — Fluxo
 
-> Visual source of truth. Code derives from here. Last updated: YYYY-MM-DD.
+> Visual source of truth. Code derives from here. Last updated: 2026-08-02.
 
 ## Direction
 
-**Thesis (one sentence):** [e.g. "A training tool that feels like an athlete's field notebook, not a SaaS dashboard."]
+**Thesis:** Clareza financeira premium — números e gráficos que respondem “para onde vai o dinheiro?”, sem parecer planilha genérica.
 
 | Field | Value |
 |-------|-------|
-| Audience | [who uses it] |
-| UI job | [what the person needs to do on this screen/flow] |
-| Tone | [e.g. direct, technical, warm, editorial] |
+| Audience | Pessoa física organizando finanças pessoais |
+| UI job | Ver saúde do mês e agir (lançar, importar, orçar) |
+| Tone | Direto, limpo, confiante |
 
 ## Anti-defaults
 
-What **this** product will not be (explicit, to prevent drift in future prompts):
-
-- Rejected fonts: [e.g. Inter, Roboto, generic system-ui]
-- Rejected palettes: [e.g. SaaS purple #6366f1, cream #F4F1EA without reason]
-- Rejected layouts: [e.g. gradient hero + three identical cards]
-- Rationale: [tie to the domain]
+- Rejected fonts: Inter, Roboto, Arial, system-ui genérico
+- Rejected palettes: SaaS purple #6366f1, cream #F4F1EA + terracotta
+- Rejected layouts: hero marketing com três cards iguais; glow neon
+- Rationale: produto de dados financeiros precisa de hierarquia tipográfica e contraste, não estética “AI SaaS”
 
 ## Color
 
-Semantic tokens. Prefer oklch in code when the project already uses it; document hex for human readability.
+| Token | Hex | Role |
+|-------|-----|------|
+| `--background` | `#0F1419` | superfície principal (dark editorial) |
+| `--foreground` | `#F2F5F7` | texto primário |
+| `--surface` | `#1A222C` | painéis / shell |
+| `--surface-elevated` | `#243040` | cards de KPI |
+| `--primary` | `#3DDC97` | ação / positivo / receita |
+| `--primary-foreground` | `#0A1210` | texto em primary |
+| `--secondary` | `#2A3544` | superfícies secundárias |
+| `--muted` | `#1E2833` | fundos sutis |
+| `--muted-foreground` | `#8B9AAB` | texto secundário |
+| `--accent` | `#5B8DEF` | destaque pontual (gráficos) |
+| `--destructive` | `#F07178` | erro / despesa |
+| `--warning` | `#E6B450` | alerta 80% orçamento |
+| `--border` | `#2E3A48` | divisores |
+| `--ring` | `#3DDC97` | focus |
 
-| Token | Hex / oklch | Role |
-|-------|-------------|------|
-| `--background` | | main surface |
-| `--foreground` | | primary text |
-| `--primary` | | primary action, strong links |
-| `--primary-foreground` | | text on primary |
-| `--secondary` | | secondary surfaces |
-| `--muted` | | subtle backgrounds |
-| `--muted-foreground` | | secondary text |
-| `--accent` | | punctual highlight (use sparingly) |
-| `--destructive` | | error / destructive action |
-| `--border` | | dividers, input borders |
-| `--ring` | | keyboard focus |
-
-**Extra surfaces (optional):** `--surface-elevated`, `--surface-inset`, `--overlay`
-
-**Dark mode:** describe inversion or a parallel palette (not just "invert").
+**Dark mode:** paleta nativa escura (não invertida de light).
 
 ## Typography
 
 | Role | Family | Weights | Use |
 |------|--------|---------|-----|
-| Display | | | titles, hero |
-| Body | | | paragraphs, UI |
-| Mono / Data | | | numbers, sets, code |
+| Display | Fraunces | 600 | marca, títulos de seção |
+| Body | Source Sans 3 | 400, 600 | UI, formulários |
+| Mono / Data | IBM Plex Mono | 500 | valores monetários |
 
-**Scale (example):**
-
-| Name | Size | Line-height | Letter-spacing |
-|------|------|-------------|----------------|
-| `text-display` | | | |
-| `text-title` | | | |
-| `text-body` | | | |
-| `text-caption` | | | |
-
-**Import:** [Google Fonts URL, local `@font-face`, etc.]
+**Import:** Google Fonts — Fraunces, Source Sans 3, IBM Plex Mono.
 
 ## Spacing & radius
 
 | Token | Value | Notes |
 |-------|-------|-------|
-| Base unit | 4px or 8px | |
-| `--radius` | | component default |
-| `--radius-sm` / `--radius-lg` | | if needed |
-| Density | compact / comfortable | card and input padding |
+| Base unit | 8px | |
+| `--radius` | 12px | painéis |
+| `--radius-sm` | 8px | inputs/botões |
+| Density | comfortable | |
 
 ## Layout
 
-**Concept:** [one sentence — e.g. "single centered column, data in horizontal bands on mobile"]
+**Concept:** shell com sidebar (desktop) e conteúdo em bandas de KPI + gráficos; mobile com nav inferior.
 
-```
-┌─────────────────────────────────────┐
-│  [header / day context]             │
-├─────────────────────────────────────┤
-│  [main content]                     │
-│                                     │
-├─────────────────────────────────────┤
-│  [primary action fixed in footer?]  │
-└─────────────────────────────────────┘
-```
-
-- Critical breakpoints: [e.g. workout timer readable at 320px]
-- Navigation: [tabs, sidebar, bottom bar]
+- Navigation: Dashboard, Transações, Importações, Contas, Orçamentos, Metas, Relatórios
 
 ## Signature
 
-**One memorable element:** [e.g. workout progress bar with rubber texture / scoreboard-style monospace counter]
+**One memorable element:** marca “Fluxo” em Fraunces com traço contínuo do logo (F + seta) e KPIs em IBM Plex Mono.
 
-**Why it serves the domain:** [one-sentence justification]
+**Why it serves the domain:** tipografia de dados + marca memorável sustentam uso recorrente do dashboard.
 
 ## Motion
 
 | Moment | Behavior | Duration | Reduced motion |
 |--------|----------|----------|----------------|
-| Page enter | | | |
-| Set feedback | | | |
-| Hover / focus | | | |
-
-## Components (shadcn / custom)
-
-Intentional deviations from stock shadcn:
-
-| Component | Change |
-|-----------|--------|
-| `Button` | [variants, radius, no shadow] |
-| `Card` | [border vs shadow, padding] |
-| `Input` | [height, focus] |
+| Page enter | fade + 8px rise | 220ms | instant |
+| KPI hover | elevação sutil | 150ms | none |
+| Chart load | opacity | 300ms | skip |
 
 ## Code map
 
-Where tokens and styles live in the repo:
-
 | Artifact | Path |
 |----------|------|
-| CSS variables | `frontend/src/index.css` |
-| Tailwind theme | `@theme inline` or `tailwind.config.*` |
-| UI components | `frontend/src/components/ui/` |
-| Illustrations / icons | [folder] |
+| CSS variables | `frontend/src/styles/_variables.scss` |
+| Global | `frontend/src/styles/_global.scss` |
+| UI / pages | `frontend/src/components/`, `frontend/src/pages/` |
+| Logo / favicon | `frontend/public/` |
 
 ## Changelog
 
 | Date | Change |
 |------|--------|
-| YYYY-MM-DD | Initial version |
+| 2026-08-02 | Identidade inicial Fluxo MVP |

@@ -11,14 +11,19 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.111.0",
     "@vieira/analytics": "file:./vendor/vieira-analytics",
+    "echarts": "^6.1.0",
+    "echarts-for-react": "^3.0.6",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@types/react-router-dom": "^5.3.3",
     "@typescript-eslint/eslint-plugin": "^7.15.0",
     "@typescript-eslint/parser": "^7.15.0",
     "@vitejs/plugin-react": "^4.3.1",

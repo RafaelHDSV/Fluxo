@@ -1,6 +1,6 @@
 # fluxo — especificacao do projeto
 
-> Guia de produto e entrega deste repositorio. Complementa **`docs/context.md`** (contexto rapido para assistentes de IA).
+> Guia de produto e entrega deste repositorio. Complementa **`docs/context.md`**.
 
 **Ano:** 2026
 
@@ -8,28 +8,27 @@
 
 ## Objetivo
 
-Descreva o problema que este projeto resolve, o publico-alvo e o resultado esperado em 2 a 4 frases.
+Controle financeiro pessoal com dashboard como tela principal: registrar/importar transações, categorizar, orçar, acompanhar metas e analisar evolução em BRL.
 
 ---
 
 ## Stack
 
-- **Front:** (ex.: React, Vite, TypeScript, SASS)
-- **Back:** (ex.: Node, Express) ou N/A
-- **Banco:** (ex.: MongoDB, PostgreSQL) ou N/A
-- **Tooling:** (ex.: Yarn, Node 22)
+- **Front:** React, Vite, TypeScript, SASS, React Router, ECharts
+- **Back:** Node, Express (BFF)
+- **Banco:** PostgreSQL / Supabase + Auth + RLS
+- **Tooling:** Yarn, Node 22+
 
 ---
 
 ## Setup e comandos locais
 
 ```bash
-yarn          # instalar dependencias
-yarn dev      # desenvolvimento
-yarn build    # build de producao
+yarn          # instalar deps da raiz
+yarn dev      # frontend + backend
 ```
 
-Em monorepo (`frontend/` + `backend/`), use os scripts da raiz (ex.: `yarn dev` com concurrently) ou entre em cada pasta conforme o README.
+Configure `frontend/.env` e `backend/.env` a partir dos `.env.example` (projeto Supabase). Aplique `backend/migrations/001_fluxo_schema.sql` no SQL Editor do Supabase.
 
 ---
 
@@ -37,8 +36,12 @@ Em monorepo (`frontend/` + `backend/`), use os scripts da raiz (ex.: `yarn dev` 
 
 | # | Tema | Decisao |
 |---|------|---------|
-| 1 | (ex.: sem Docker na v1) | |
-| 2 | | |
+| 1 | Nome | Fluxo |
+| 2 | Auth MVP | Supabase Auth obrigatório |
+| 3 | API | Express BFF |
+| 4 | Gráficos | Apache ECharts |
+| 5 | Importação | CSV + OFX |
+| 6 | Moeda | BRL |
 
 ---
 
@@ -46,15 +49,15 @@ Em monorepo (`frontend/` + `backend/`), use os scripts da raiz (ex.: `yarn dev` 
 
 | Item | Link |
 |------|------|
-| Epic ou issue principal | (cole a URL) |
-| Board / projeto | |
+| Epic ou issue principal | https://github.com/RafaelHDSV/Fluxo/issues/1 |
+| Proposta | `.issues/2026-08-02-fluxo-mvp.md` |
 
 ---
 
 ## Fora de escopo
 
-- 
-- 
+- Conciliação bancária em tempo real / Open Finance
+- Produto multiempresa
 
 ---
 
@@ -62,9 +65,10 @@ Em monorepo (`frontend/` + `backend/`), use os scripts da raiz (ex.: `yarn dev` 
 
 | Arquivo | Uso |
 |---------|-----|
-| `docs/context.md` | Stack, portas, decisoes fixas — contexto primario para IA |
-| Este arquivo | Objetivo, escopo, decisoes de produto, link da epic |
+| `docs/context.md` | Stack, portas, decisoes fixas |
+| `docs/DESIGN.md` | Identidade visual |
+| Este arquivo | Objetivo, escopo, link da epic |
 
 ---
 
-*Gerado com Vieira CLI (`vieira common` ou scaffold `front` / `full` / `extension`). Epics do repositório Vieira CLI no board usam a skill `especificacao-cards` — fluxo separado.*
+*MVP Fluxo — alinhado ao issue #1.*

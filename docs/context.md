@@ -8,7 +8,7 @@
 
 ## Objetivo
 
-Descreva em 2 a 4 frases o que este projeto faz, para quem e qual problema resolve.
+Fluxo é um controle financeiro pessoal web: entradas, saídas, contas, categorias, importação CSV/OFX, orçamentos, metas e dashboard analítico com Apache ECharts. Resolve a falta de clareza visual e o excesso de cadastro manual em planilhas.
 
 ---
 
@@ -16,10 +16,10 @@ Descreva em 2 a 4 frases o que este projeto faz, para quem e qual problema resol
 
 | Camada | Tecnologia / nota |
 |--------|-------------------|
-| Front | (ex.: React, Vite, TypeScript, SASS) |
-| Back | (ex.: Node, Express) ou N/A |
-| Banco | (ex.: MongoDB, PostgreSQL) ou N/A |
-| Tooling | (ex.: Yarn, Node 22) |
+| Front | React 18, Vite, TypeScript, SASS, React Router, ECharts |
+| Back | Node, Express 5 (BFF) |
+| Banco / Auth | PostgreSQL via Supabase + Supabase Auth + RLS |
+| Tooling | Yarn, Node 22+ |
 
 ---
 
@@ -27,16 +27,18 @@ Descreva em 2 a 4 frases o que este projeto faz, para quem e qual problema resol
 
 | Servico | Porta / URL |
 |---------|-------------|
-| Front | (ex.: http://localhost:3333) |
-| API | (ex.: http://localhost:3693) ou N/A |
+| Front | http://localhost:5173 |
+| API | http://localhost:3693 |
 
 ---
 
 ## Decisoes fixas
 
-1. (ex.: nao sobrescrever arquivos existentes no scaffold)
-2. (ex.: sem Docker na v1)
-3. 
+1. Auth obrigatória no MVP (Supabase e-mail/senha)
+2. Express BFF + Supabase Postgres/Storage (não front-only)
+3. Moeda BRL; Open Finance fora do MVP
+4. Gráficos: Apache ECharts
+5. Estilo: SASS (sem Tailwind na v1)
 
 ---
 
@@ -44,17 +46,18 @@ Descreva em 2 a 4 frases o que este projeto faz, para quem e qual problema resol
 
 | Tipo | URL |
 |------|-----|
-| Repositorio | |
-| Epic / board | |
-| Documentacao | `docs/especificacao.md` (se existir) |
+| Repositorio | https://github.com/RafaelHDSV/Fluxo |
+| Epic / board | https://github.com/RafaelHDSV/Fluxo/issues/1 |
+| Documentacao | `docs/especificacao.md`, `docs/DESIGN.md`, `docs/superpowers/` |
 
 ---
 
 ## Fora de escopo
 
-- 
-- 
+- Open Finance / Pluggy / Belvo
+- Notion API nativa (apenas CSV export)
+- App mobile e multi-moeda
 
 ---
 
-*Gerado com Vieira CLI (`vieira common` ou scaffold `front` / `full` / `extension`).*
+*Atualizado no MVP Fluxo (2026-08-02).*

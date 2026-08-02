@@ -1,0 +1,191 @@
+import { Router } from 'express'
+import { query, queryOne } from '../../lib/db.js'
+import { buildDedupeHash, toNumber } from '../../lib/money.js'
+import { requireAuth } from '../../middleware/auth.js'
+import { suggestCategoryId } from '../categories/suggestCategory.js'
+
+const router = Router()
+router.use(requireAuth)
+
+router.get('/', async (req, res) => {
+  const { q, type, account_id, category_id, from, to } = req.query
+  const params: unknown[] = [req.userId]
+  const where = ['user_id = $1']
+
+  if (typeof q === 'string' && q.trim()) {
+    params.push(`%${q.trim()}%`)
+    where.push(`description ilike $${params.length}`)
+  }
+  if (typeof type === 'string' && type) {
+    params.push(type)
+    where.push(`type = $${params.length}`)
+  }
+  if (typeof account_id === 'string' && account_id) {
+    params.push(account_id)
+    where.push(`account_id = $${params.length}`)
+  }
+  if (typeof category_id === 'string' && category_id) {
+    params.push(category_id)
+    where.push(`category_id = $${params.length}`)
+  }
+  if (typeof from === 'string' && from) {
+    params.push(from)
+    where.push(`date >= $${params.length}`)
+  }
+  if (typeof to === 'string' && to) {
+    params.push(to)
+    where.push(`date <= $${params.length}`)
+  }
+
+  const rows = await query(
+    `select * from transactions where ${where.join(' and ')} order by date desc, created_at desc limit 500`,
+    params,
+  )
+  res.json(rows)
+})
+
+router.post('/', async (req, res) => {
+  const body = req.body ?? {}
+  const {
+    date,
+    description,
+    amount,
+    type,
+    category_id,
+    account_id,
+    transfer_account_id,
+    card_account_id,
+    tags = [],
+    notes,
+    external_fitid,
+  } = body
+
+  if (!date || !description || amount == null || !type || !account_id) {
+    return res.status(400).json({ error: 'Campos obrigatórios ausentes' })
+  }
+
+  let categoryId = category_id as string | undefined
+  if (!categoryId) {
+    categoryId = (await suggestCategoryId(req.userId!, description)) ?? undefined
+  }
+  if (!categoryId) {
+    return res.status(400).json({ error: 'category_id é obrigatório (sem categoria padrão)' })
+  }
+
+  const dedupe_hash = buildDedupeHash({
+    userId: req.userId!,
+    date,
+    amount: toNumber(amount),
+    description,
+    accountId: account_id,
+    fitid: external_fitid,
+  })
+
+  try {
+    const row = await queryOne(
+      `insert into transactions
+        (user_id, date, description, amount, type, category_id, account_id, transfer_account_id,
+         card_account_id, tags, notes, dedupe_hash, external_fitid)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       returning *`,
+      [
+        req.userId,
+        date,
+        description,
+        toNumber(amount),
+        type,
+        categoryId,
+        account_id,
+        transfer_account_id ?? null,
+        card_account_id ?? null,
+        tags,
+        notes ?? null,
+        dedupe_hash,
+        external_fitid ?? null,
+      ],
+    )
+    res.status(201).json(row)
+  } catch (error: unknown) {
+    const pgError = error as { code?: string }
+    if (pgError.code === '23505') {
+      return res.status(409).json({ error: 'Transação duplicada' })
+    }
+    throw error
+  }
+})
+
+router.put('/:id', async (req, res) => {
+  const body = req.body ?? {}
+  const existing = await queryOne<{
+    id: string
+    date: string
+    description: string
+    amount: string
+    account_id: string
+    external_fitid: string | null
+  }>(`select * from transactions where id = $1 and user_id = $2`, [req.params.id, req.userId])
+
+  if (!existing) return res.status(404).json({ error: 'Transação não encontrada' })
+
+  const date = body.date ?? existing.date
+  const description = body.description ?? existing.description
+  const amount = body.amount != null ? toNumber(body.amount) : toNumber(existing.amount)
+  const account_id = body.account_id ?? existing.account_id
+  const external_fitid = body.external_fitid ?? existing.external_fitid
+
+  const dedupe_hash = buildDedupeHash({
+    userId: req.userId!,
+    date,
+    amount,
+    description,
+    accountId: account_id,
+    fitid: external_fitid,
+  })
+
+  const row = await queryOne(
+    `update transactions set
+      date = $3,
+      description = $4,
+      amount = $5,
+      type = coalesce($6, type),
+      category_id = coalesce($7, category_id),
+      account_id = $8,
+      transfer_account_id = coalesce($9, transfer_account_id),
+      card_account_id = coalesce($10, card_account_id),
+      tags = coalesce($11, tags),
+      notes = coalesce($12, notes),
+      dedupe_hash = $13,
+      external_fitid = $14,
+      updated_at = now()
+     where id = $1 and user_id = $2
+     returning *`,
+    [
+      req.params.id,
+      req.userId,
+      date,
+      description,
+      amount,
+      body.type ?? null,
+      body.category_id ?? null,
+      account_id,
+      body.transfer_account_id ?? null,
+      body.card_account_id ?? null,
+      body.tags ?? null,
+      body.notes ?? null,
+      dedupe_hash,
+      external_fitid ?? null,
+    ],
+  )
+  res.json(row)
+})
+
+router.delete('/:id', async (req, res) => {
+  const row = await queryOne(`delete from transactions where id = $1 and user_id = $2 returning id`, [
+    req.params.id,
+    req.userId,
+  ])
+  if (!row) return res.status(404).json({ error: 'Transação não encontrada' })
+  res.status(204).send()
+})
+
+export default router
