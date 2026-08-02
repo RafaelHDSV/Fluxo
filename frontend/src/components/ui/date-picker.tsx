@@ -163,6 +163,11 @@ export function DatePicker({ id, value, onChange, required, className, disabled 
           }}
           onBlur={onInputBlur}
           onKeyDown={(e) => {
+            if (e.key === 'Tab') {
+              // Fecha o painel para o Tab ir ao próximo campo do form, não aos botões do calendário
+              setOpen(false)
+              return
+            }
             if (e.key === 'Enter') {
               e.preventDefault()
               onInputBlur()
@@ -199,11 +204,25 @@ export function DatePicker({ id, value, onChange, required, className, disabled 
           className="absolute left-0 top-full z-50 mt-1 w-[280px] rounded-xl border border-border bg-surface p-3 shadow-lg"
         >
           <div className="mb-3 flex items-center justify-between gap-2">
-            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => shiftMonth(-1)}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              tabIndex={-1}
+              className="h-8 w-8"
+              onClick={() => shiftMonth(-1)}
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <p className="text-sm font-semibold">{monthLabel(viewYear, viewMonth)}</p>
-            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => shiftMonth(1)}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              tabIndex={-1}
+              className="h-8 w-8"
+              onClick={() => shiftMonth(1)}
+            >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -225,6 +244,7 @@ export function DatePicker({ id, value, onChange, required, className, disabled 
                 <button
                   key={cell.iso}
                   type="button"
+                  tabIndex={-1}
                   className={cn(
                     'flex h-9 items-center justify-center rounded-lg text-sm transition-colors hover:bg-muted',
                     isSelected && 'bg-primary text-primary-foreground hover:bg-primary/90',
@@ -247,6 +267,7 @@ export function DatePicker({ id, value, onChange, required, className, disabled 
               type="button"
               variant="outline"
               size="sm"
+              tabIndex={-1}
               className="flex-1"
               onClick={() => {
                 onChange(today)
@@ -256,7 +277,14 @@ export function DatePicker({ id, value, onChange, required, className, disabled 
             >
               Hoje
             </Button>
-            <Button type="button" variant="ghost" size="sm" className="flex-1" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              tabIndex={-1}
+              className="flex-1"
+              onClick={() => setOpen(false)}
+            >
               Fechar
             </Button>
           </div>
