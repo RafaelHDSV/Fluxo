@@ -3,10 +3,11 @@ import { cn } from '@/lib/utils'
 type Props = {
   label: string
   value: string
+  hint?: string
   tone?: 'default' | 'positive' | 'negative'
 }
 
-export function SummaryCard({ label, value, tone = 'default' }: Props) {
+export function SummaryCard({ label, value, hint, tone = 'default' }: Props) {
   return (
     <article
       className={cn(
@@ -25,6 +26,7 @@ export function SummaryCard({ label, value, tone = 'default' }: Props) {
       >
         {value}
       </p>
+      {hint ? <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p> : null}
     </article>
   )
 }

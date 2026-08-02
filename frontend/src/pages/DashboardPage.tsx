@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, CreditCard, Receipt, Wallet } from 'lucide-react'
+import { CreditCard, Receipt, Wallet } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DashboardCharts } from '@/components/charts/DashboardCharts'
@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatBRL, formatDeltaPct } from '@/lib/format'
+import { formatBRL } from '@/lib/format'
 import { currentYearMonth, periodBounds, type PeriodMode } from '@/lib/period'
 import { api } from '@/services/api'
 import { cn } from '@/lib/utils'
@@ -44,27 +44,6 @@ type Dashboard = {
   upcomingCards: Array<{ name: string; due_day: number }>
   alerts: Array<{ level: string; message: string }>
   goals: Array<{ name: string; current_amount: string | number; target_amount: string | number }>
-}
-
-function DeltaHint({ value, invert }: { value: number | null | undefined; invert?: boolean }) {
-  if (value == null || !Number.isFinite(value)) {
-    return <span className="text-xs text-muted-foreground">— vs mês anterior</span>
-  }
-  const positive = invert ? value < 0 : value > 0
-  const negative = invert ? value > 0 : value < 0
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-0.5 text-xs',
-        positive && 'text-primary',
-        negative && 'text-destructive',
-        !positive && !negative && 'text-muted-foreground',
-      )}
-    >
-      {value > 0 ? <ArrowUpRight className="h-3 w-3" /> : value < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
-      {formatDeltaPct(value)} vs mês anterior
-    </span>
-  )
 }
 
 export function DashboardPage() {
@@ -109,6 +88,9 @@ export function DashboardPage() {
   ]
 
   const yearOptions = Array.from({ length: 5 }, (_, i) => defaultYear - 2 + i)
+  const unpaidTotal = data?.unpaidTotal ?? 0
+  const unpaidCount = data?.unpaidCount ?? 0
+  const projectedAfterPayables = data ? data.balance - unpaidTotal : 0
 
   return (
     <div className="space-y-6">
@@ -178,64 +160,55 @@ export function DashboardPage() {
       </div>
 
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-xl" />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 w-full rounded-xl" />
           ))}
         </div>
       ) : data ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <div className="space-y-1">
-              <SummaryCard label="Saldo nas contas" value={formatBRL(data.balance)} />
-              <p className="text-xs text-muted-foreground">Saldo atual cadastrado nas contas.</p>
-            </div>
-            {periodMode !== 'all' && data.openingBalance != null && (
-              <div className="space-y-1">
-                <SummaryCard label="Saldo inicial" value={formatBRL(data.openingBalance)} />
-                <p className="text-xs text-muted-foreground">
-                  Estimado a partir do saldo atual menos o movimento do período.
-                </p>
-              </div>
-            )}
-            <div className="space-y-1">
-              <SummaryCard label="Receitas" value={formatBRL(data.income)} tone="positive" />
-              {periodMode === 'month' && <DeltaHint value={data.incomeDeltaPct} />}
-            </div>
-            <div className="space-y-1">
-              <SummaryCard label="Despesas" value={formatBRL(data.expense)} tone="negative" />
-              {periodMode === 'month' && <DeltaHint value={data.expenseDeltaPct} invert />}
-            </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+            <SummaryCard
+              label="Receitas"
+              value={formatBRL(data.income)}
+              tone="positive"
+              hint="Tudo que entrou no período"
+            />
+            <SummaryCard
+              label="Despesas"
+              value={formatBRL(data.expense)}
+              tone="negative"
+              hint="Já pagas no período"
+            />
+            <SummaryCard
+              label="Saldo do mês"
+              value={formatBRL(data.result)}
+              tone={data.result >= 0 ? 'positive' : 'negative'}
+              hint="Receitas − despesas pagas"
+            />
             <div className="space-y-1">
               <SummaryCard
-                label="Resultado do período"
-                value={formatBRL(data.result)}
-                tone={data.result >= 0 ? 'positive' : 'negative'}
+                label="Ainda a pagar"
+                value={formatBRL(unpaidTotal)}
+                tone={unpaidTotal > 0 ? 'negative' : 'default'}
+                hint={
+                  unpaidCount > 0
+                    ? `${unpaidCount} despesa(s) pendente(s)`
+                    : 'Nenhuma pendência no período'
+                }
               />
-            </div>
-            {periodMode !== 'all' && data.closingBalance != null && (
-              <div className="space-y-1">
-                <SummaryCard
-                  label="Saldo final (projetado)"
-                  value={formatBRL(data.closingBalance)}
-                  tone={data.closingBalance >= 0 ? 'positive' : 'negative'}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Inicial + receitas − despesas pagas do mês.
-                </p>
-              </div>
-            )}
-            <div className="space-y-1">
-              <SummaryCard label="Taxa de economia" value={`${data.savingsRate.toFixed(1)}%`} />
-            </div>
-            {(data.unpaidCount ?? 0) > 0 && periodMode === 'month' && (
-              <div className="space-y-1">
-                <SummaryCard label="A pagar (mês)" value={formatBRL(data.unpaidTotal ?? 0)} tone="negative" />
+              {unpaidCount > 0 && (
                 <Link to="/a-pagar" className="text-xs text-warning hover:underline">
-                  {data.unpaidCount} despesa(s) pendente(s)
+                  Ver a pagar
                 </Link>
-              </div>
-            )}
+              )}
+            </div>
+            <SummaryCard
+              label="Saldo após a pagar"
+              value={formatBRL(projectedAfterPayables)}
+              tone={projectedAfterPayables >= 0 ? 'positive' : 'negative'}
+              hint={`Saldo nas contas (${formatBRL(data.balance)}) − a pagar`}
+            />
           </div>
 
           {(data.alerts?.length ?? 0) > 0 && (

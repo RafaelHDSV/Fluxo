@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -23,6 +24,7 @@ import {
 import { formatBRL, formatDate } from '@/lib/format'
 import { currentYearMonth, periodBounds } from '@/lib/period'
 import { labelOf, paymentMethodLabel } from '@/lib/labels'
+import { cn } from '@/lib/utils'
 import { api } from '@/services/api'
 
 type Account = { id: string; name: string }
@@ -56,6 +58,10 @@ export function PayablesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const selectionAnchorRef = useRef<number | null>(null)
+  const shiftClickRef = useRef(false)
 
   const periodLabel = useMemo(() => {
     if (filter === 'all') return 'todo o histórico'
@@ -69,6 +75,10 @@ export function PayablesPage() {
   )
   const accountMap = useMemo(() => Object.fromEntries(accounts.map((a) => [a.id, a.name])), [accounts])
 
+  const itemIds = useMemo(() => items.map((t) => t.id), [items])
+  const allSelected = itemIds.length > 0 && itemIds.every((id) => selectedIds.has(id))
+  const someSelected = itemIds.some((id) => selectedIds.has(id))
+
   const totals = useMemo(() => {
     let total = 0
     let credit = 0
@@ -76,12 +86,19 @@ export function PayablesPage() {
     for (const tx of items) {
       const amount = Number(tx.amount) || 0
       total += amount
-      // Cartão só conta o que tem vencimento (due_date) definido
       if (tx.payment_method === 'credit' && tx.due_date) credit += amount
       else other += amount
     }
     return { total, credit, other }
   }, [items])
+
+  const selectedTotal = useMemo(() => {
+    let sum = 0
+    for (const tx of items) {
+      if (selectedIds.has(tx.id)) sum += Number(tx.amount) || 0
+    }
+    return sum
+  }, [items, selectedIds])
 
   async function load() {
     setLoading(true)
@@ -120,15 +137,73 @@ export function PayablesPage() {
     load()
   }, [filter, pickYear, pickMonth])
 
+  useEffect(() => {
+    setSelectedIds(new Set())
+    selectionAnchorRef.current = null
+  }, [filter, pickYear, pickMonth])
+
+  function toggleSelect(id: string, checked: boolean) {
+    const index = itemIds.indexOf(id)
+    if (shiftClickRef.current && selectionAnchorRef.current != null && index >= 0) {
+      const from = Math.min(selectionAnchorRef.current, index)
+      const to = Math.max(selectionAnchorRef.current, index)
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        for (let i = from; i <= to; i++) next.add(itemIds[i])
+        return next
+      })
+      shiftClickRef.current = false
+      return
+    }
+    shiftClickRef.current = false
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(id)
+      else next.delete(id)
+      return next
+    })
+    if (index >= 0) selectionAnchorRef.current = index
+  }
+
+  function toggleSelectAll(checked: boolean) {
+    if (checked) setSelectedIds(new Set(itemIds))
+    else setSelectedIds(new Set())
+    selectionAnchorRef.current = checked && itemIds.length > 0 ? 0 : null
+  }
+
   async function markPaid(tx: Tx) {
     setBusyId(tx.id)
     try {
       await api.put(`/api/transactions/${tx.id}`, { paid: true })
       setItems((prev) => prev.filter((t) => t.id !== tx.id))
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(tx.id)
+        return next
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao marcar como pago')
     } finally {
       setBusyId(null)
+    }
+  }
+
+  async function bulkMarkPaid() {
+    if (selectedIds.size === 0) return
+    setBulkBusy(true)
+    setError('')
+    try {
+      await api.post<{ updated: number }>('/api/transactions/bulk-paid', {
+        ids: Array.from(selectedIds),
+        paid: true,
+      })
+      setItems((prev) => prev.filter((t) => !selectedIds.has(t.id)))
+      setSelectedIds(new Set())
+      selectionAnchorRef.current = null
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao marcar selecionadas como pagas')
+    } finally {
+      setBulkBusy(false)
     }
   }
 
@@ -252,7 +327,41 @@ export function PayablesPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Despesas pendentes</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {selectedIds.size > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+              <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span>
+                  {selectedIds.size} selecionada{selectedIds.size === 1 ? '' : 's'}
+                </span>
+                <span className="font-mono tabular-nums font-semibold">
+                  Total {formatBRL(selectedTotal)}
+                </span>
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={bulkBusy}
+                  onClick={() => void bulkMarkPaid()}
+                >
+                  Marcar pago
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedIds(new Set())
+                    selectionAnchorRef.current = null
+                  }}
+                >
+                  Limpar seleção
+                </Button>
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <div className="space-y-2">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -268,6 +377,13 @@ export function PayablesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                        onCheckedChange={(c) => toggleSelectAll(c === true)}
+                        aria-label="Selecionar todas"
+                      />
+                    </TableHead>
                     <TableHead>Vencimento</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead>Categoria</TableHead>
@@ -279,7 +395,25 @@ export function PayablesPage() {
                 </TableHeader>
                 <TableBody>
                   {items.map((tx) => (
-                    <TableRow key={tx.id}>
+                    <TableRow
+                      key={tx.id}
+                      data-state={selectedIds.has(tx.id) ? 'selected' : undefined}
+                      className={cn(
+                        selectedIds.has(tx.id)
+                          ? 'border-l-4 border-l-primary bg-primary/10 hover:bg-primary/15'
+                          : 'border-l-4 border-l-transparent',
+                      )}
+                    >
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(tx.id)}
+                          onPointerDown={(e) => {
+                            shiftClickRef.current = e.shiftKey
+                          }}
+                          onCheckedChange={(c) => toggleSelect(tx.id, c === true)}
+                          aria-label={`Selecionar ${tx.description}`}
+                        />
+                      </TableCell>
                       <TableCell>
                         {tx.payment_method === 'credit' && tx.due_date ? (
                           <span className="whitespace-nowrap">
@@ -308,7 +442,7 @@ export function PayablesPage() {
                         <Button
                           size="sm"
                           type="button"
-                          disabled={busyId === tx.id}
+                          disabled={busyId === tx.id || bulkBusy}
                           onClick={() => markPaid(tx)}
                         >
                           Marcar pago
