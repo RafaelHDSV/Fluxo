@@ -1,0 +1,12 @@
+---
+description: Read project docs/context.md when present — primary task context
+alwaysApply: true
+---
+
+# Project context
+
+On every request, check for `docs/context.md` in the project.
+
+If it exists, use its content as primary context to interpret, answer, or execute the task, unless explicitly told to ignore it.
+
+Projects generated with Vieira CLI receive this file via `templates/common/docs/context.md`.

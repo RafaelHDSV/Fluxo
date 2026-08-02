@@ -1,0 +1,15 @@
+{
+  "name": "fluxo",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n frontend,backend -c blue,green \"yarn dev:frontend\" \"yarn dev:backend\"",
+    "dev:frontend": "cd frontend && yarn && yarn dev",
+    "dev:backend": "cd backend && yarn && yarn dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "@vieira/analytics": "file:./vendor/vieira-analytics"
+  }
+}

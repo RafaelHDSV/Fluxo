@@ -1,0 +1,25 @@
+{
+  "terminal.integrated.profiles.windows": {
+    "PowerShell (nvm)": {
+      "source": "PowerShell",
+      "icon": "terminal-powershell",
+      "args": [
+        "-NoExit",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        ". \"${workspaceFolder}\\scripts\\loadNvmAndNode.ps1\""
+      ]
+    }
+  },
+  "terminal.integrated.defaultProfile.windows": "PowerShell (nvm)",
+  "terminal.integrated.automationProfile.windows": {
+    "path": "${env:windir}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "args": [
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      ". \"${workspaceFolder}\\scripts\\loadNvmAndNode.ps1\""
+    ]
+  }
+}

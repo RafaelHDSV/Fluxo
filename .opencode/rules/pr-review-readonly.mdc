@@ -1,0 +1,56 @@
+---
+description: PR review security lock — skill pr-review is read-only; never approve, comment, or publish on GitHub unless explicitly asked to override
+alwaysApply: true
+---
+
+# PR review — read-only security lock
+
+Applies whenever the user asks to **review PR(s)**, cites **skill `pr-review`**, or the agent follows the PR review workflow (`.reviews/` artifact).
+
+## Single deliverable (one file per PR)
+
+The **only** allowed outcome of a PR review session is one or more markdown files under `.reviews/`, with **at most one canonical file per PR**:
+
+```
+.reviews/<YYYY-MM-DD-HH-MM-SS>-<repo-slug>-pr-<N>.md
+```
+
+| Situation | Action |
+|-----------|--------|
+| No file for `<repo-slug>-pr-<N>` | **Create** a new timestamped file |
+| One or more files already match `*-<repo-slug>-pr-<N>.md` | **Update in-place** the **newest** (highest timestamp in the filename); do **not** create another file for that PR |
+| Legacy duplicates already on disk | Leave older files untouched unless the user explicitly asks to delete them |
+
+The user reads these files and **manually** decides what to do on GitHub.
+
+## Forbidden without explicit override
+
+Do **not** take any write action on GitHub — even if the analysis concludes the PR is good or bad:
+
+| Forbidden | Examples |
+|-----------|----------|
+| Approve PR | GitHub **Approve** review, `APPROVE` event, `gh pr review --approve` |
+| Request changes | **Request changes** review, `gh pr review --request-changes` |
+| Comment on PR | PR conversation comment, review summary comment, inline review comment |
+| Merge / close / edit PR | `gh pr merge`, `gh pr close`, change title/body/labels |
+| MCP GitHub writes | `github__pull_request_review_write`, merge/update/comment tools |
+
+**Preliminary verdict** inside `.reviews/*.md` (`aprovar`, `request_changes`, etc.) is **analysis for the human reviewer only** — it is **not** permission to act on GitHub.
+
+## Required chat confirmation
+
+After saving `.reviews/` file(s), state clearly that **no action was taken on GitHub** and the user should use the markdown for manual review.
+
+## Override (exception)
+
+These locks stay in force **unless** the user **explicitly** says one of:
+
+- ignore security locks / ignore travas de segurança / ignorar travas
+- publish the review on GitHub / approve this PR / comment on the PR / request changes on GitHub
+
+Vague approval in chat (“looks good”, “LGTM”) or a positive **preliminary verdict** in the artifact **does not** override this rule.
+
+## Related
+
+- Skill: `.opencode/skills/pr-review/SKILL.md`
+- Git policy: `git-github.mdc`
