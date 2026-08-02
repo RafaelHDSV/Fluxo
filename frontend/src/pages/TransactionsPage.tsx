@@ -2,6 +2,7 @@ import { Fragment, FormEvent, useCallback, useEffect, useMemo, useRef, useState 
 import { Pencil, Trash2 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { TruncatedText } from '@/components/TruncatedText'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import {
   Select,
   SelectContent,
@@ -406,6 +408,7 @@ export function TransactionsPage() {
   const yearOptions = Array.from({ length: 5 }, (_, i) => defaultYear - 2 + i)
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       <header>
         <h1 className="font-display text-2xl font-semibold tracking-tight">Transações</h1>
@@ -827,19 +830,13 @@ export function TransactionsPage() {
                               )}
                             </TableCell>
                             <TableCell className="max-w-[220px]">
-                              <span className="block truncate" title={tx.description}>
-                                {tx.description}
-                              </span>
+                              <TruncatedText text={tx.description} />
                             </TableCell>
                             <TableCell className="max-w-[140px]">
-                              <span className="block truncate" title={categoryMap[tx.category_id] || undefined}>
-                                {categoryMap[tx.category_id] || '—'}
-                              </span>
+                              <TruncatedText text={categoryMap[tx.category_id] || '—'} />
                             </TableCell>
                             <TableCell className="max-w-[120px]">
-                              <span className="block truncate" title={accountMap[tx.account_id] || undefined}>
-                                {accountMap[tx.account_id] || '—'}
-                              </span>
+                              <TruncatedText text={accountMap[tx.account_id] || '—'} />
                             </TableCell>
                             <TableCell>
                               <Badge variant="muted">{labelOf(transactionTypeLabel, tx.type)}</Badge>
@@ -957,5 +954,6 @@ export function TransactionsPage() {
         loading={deleting}
       />
     </div>
+    </TooltipProvider>
   )
 }

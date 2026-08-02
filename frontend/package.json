@@ -20,6 +20,7 @@
     "@radix-ui/react-slot": "^1.3.3",
     "@radix-ui/react-switch": "^1.3.7",
     "@radix-ui/react-tabs": "^1.1.21",
+    "@radix-ui/react-tooltip": "^1.2.16",
     "@supabase/supabase-js": "^2.111.0",
     "@vieira/analytics": "file:./vendor/vieira-analytics",
     "class-variance-authority": "^0.7.1",
