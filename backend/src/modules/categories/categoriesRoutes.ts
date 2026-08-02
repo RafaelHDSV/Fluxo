@@ -1,7 +1,10 @@
 import { Router } from 'express'
+import { effectiveDateSql } from '../../lib/creditCycle.js'
 import { query, queryOne } from '../../lib/db.js'
 import { T } from '../../lib/tables.js'
 import { requireAuth } from '../../middleware/auth.js'
+
+const EFF_T = effectiveDateSql('t')
 
 const router = Router()
 router.use(requireAuth)
@@ -54,12 +57,12 @@ router.get('/stats', async (req, res) => {
       coalesce((
         select sum(t.amount) from ${T.transactions} t
         where t.user_id = c.user_id and t.category_id = c.id and t.type = 'expense' and t.paid = true
-          and t.date between $2 and $3
+          and ${EFF_T} between $2 and $3
       ),0) as spent_month,
       coalesce((
         select sum(t.amount) from ${T.transactions} t
         where t.user_id = c.user_id and t.category_id = c.id and t.type = 'expense' and t.paid = true
-          and t.date between $4 and $5
+          and ${EFF_T} between $4 and $5
       ),0) as spent_year,
       coalesce((
         select sum(t.amount) from ${T.transactions} t
@@ -99,12 +102,12 @@ router.get('/stats', async (req, res) => {
       coalesce((
         select sum(t.amount) from ${T.transactions} t
         where t.user_id = c.user_id and t.category_id = c.id and t.type = 'expense' and t.paid = true
-          and t.date between $2 and $3
+          and ${EFF_T} between $2 and $3
       ),0) as spent_month,
       coalesce((
         select sum(t.amount) from ${T.transactions} t
         where t.user_id = c.user_id and t.category_id = c.id and t.type = 'expense' and t.paid = true
-          and t.date between $4 and $5
+          and ${EFF_T} between $4 and $5
       ),0) as spent_year,
       coalesce((
         select sum(t.amount) from ${T.transactions} t

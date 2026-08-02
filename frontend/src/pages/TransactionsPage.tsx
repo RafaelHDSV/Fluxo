@@ -25,22 +25,32 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { computeCreditDueDate } from '@/lib/creditCycle'
 import { formatDate, formatMonth, formatSignedBRL, todayISO } from '@/lib/format'
 import { currentYearMonth, periodBounds, type PeriodMode } from '@/lib/period'
 import { labelOf, paymentMethodLabel, transactionTypeLabel } from '@/lib/labels'
 import { cn } from '@/lib/utils'
 import { api } from '@/services/api'
 
-type Account = { id: string; name: string }
+type Account = {
+  id: string
+  name: string
+  type?: string
+  due_day?: number | null
+  closing_day?: number | null
+}
 type Category = { id: string; name: string }
 type Tx = {
   id: string
   date: string
+  due_date?: string | null
+  effective_date?: string | null
   description: string
   amount: string | number
   type: string
   category_id: string
   account_id: string
+  card_account_id?: string | null
   transfer_account_id?: string | null
   notes?: string | null
   paid: boolean
@@ -58,6 +68,8 @@ const emptyForm = {
   type: 'expense',
   category_id: '',
   account_id: '',
+  card_account_id: '',
+  due_date: '',
   transfer_account_id: '',
   notes: '',
   paid: true,
@@ -66,6 +78,10 @@ const emptyForm = {
 
 function monthKey(date: string) {
   return String(date).slice(0, 7)
+}
+
+function txEffectiveDate(tx: Tx) {
+  return String(tx.effective_date || tx.due_date || tx.date).slice(0, 10)
 }
 
 function parsePeriodMode(raw: string | null): PeriodMode {
@@ -128,6 +144,7 @@ export function TransactionsPage() {
 
   const isIncomeOnly = type === 'income'
   const isExpenseForm = form.type === 'expense'
+  const isCreditForm = isExpenseForm && form.payment_method === 'credit'
   const showMeioColumn = !isIncomeOnly
   const tableColSpan = colSpanFor(showMeioColumn, isIncomeOnly)
 
@@ -136,6 +153,10 @@ export function TransactionsPage() {
     [categories],
   )
   const accountMap = useMemo(() => Object.fromEntries(accounts.map((a) => [a.id, a.name])), [accounts])
+  const creditCards = useMemo(
+    () => accounts.filter((a) => a.type === 'credit_card'),
+    [accounts],
+  )
 
   const pageIds = useMemo(() => items.map((t) => t.id), [items])
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
@@ -235,6 +256,16 @@ export function TransactionsPage() {
     load()
   }, [load])
 
+  function previewDueDate(purchaseDate: string, cardAccountId: string, cardList = creditCards) {
+    const card = cardList.find((c) => c.id === cardAccountId)
+    if (!card?.closing_day || !card?.due_day || !purchaseDate) return ''
+    try {
+      return computeCreditDueDate(purchaseDate, card.closing_day, card.due_day)
+    } catch {
+      return ''
+    }
+  }
+
   function cancelEdit() {
     setEditingId(null)
     setForm({
@@ -257,6 +288,8 @@ export function TransactionsPage() {
         account_id: form.account_id,
         paid: form.type === 'income' ? true : form.paid,
         payment_method: form.type === 'expense' ? form.payment_method || null : null,
+        card_account_id: isCreditForm && form.card_account_id ? form.card_account_id : null,
+        due_date: isCreditForm && form.due_date ? form.due_date : null,
         transfer_account_id:
           form.type === 'transfer' && form.transfer_account_id ? form.transfer_account_id : null,
         notes: form.type === 'adjustment' && form.notes ? form.notes : null,
@@ -341,6 +374,8 @@ export function TransactionsPage() {
       type: tx.type,
       category_id: tx.category_id,
       account_id: tx.account_id,
+      card_account_id: tx.card_account_id || '',
+      due_date: tx.due_date ? String(tx.due_date).slice(0, 10) : '',
       transfer_account_id: tx.transfer_account_id || '',
       notes: tx.notes || '',
       paid: Boolean(tx.paid),
@@ -355,7 +390,7 @@ export function TransactionsPage() {
     const groups: Array<{ key: string; label: string; items: Tx[] }> = []
     let currentKey = ''
     for (const tx of items) {
-      const key = monthKey(tx.date)
+      const key = monthKey(txEffectiveDate(tx))
       if (key !== currentKey) {
         currentKey = key
         groups.push({ key, label: formatMonth(key, 'long'), items: [tx] })
@@ -385,8 +420,21 @@ export function TransactionsPage() {
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
-                <Label>Data</Label>
-                <DatePicker value={form.date} onChange={(date) => setForm({ ...form, date })} required />
+                <Label>{isCreditForm ? 'Data da compra' : 'Data'}</Label>
+                <DatePicker
+                  value={form.date}
+                  onChange={(date) =>
+                    setForm({
+                      ...form,
+                      date,
+                      due_date:
+                        form.payment_method === 'credit'
+                          ? previewDueDate(date, form.card_account_id) || form.due_date
+                          : form.due_date,
+                    })
+                  }
+                  required
+                />
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="tx-desc">Descrição</Label>
@@ -429,7 +477,20 @@ export function TransactionsPage() {
                   <Label>Meio de pagamento</Label>
                   <Select
                     value={form.payment_method}
-                    onValueChange={(v) => setForm({ ...form, payment_method: v as 'debit' | 'credit' })}
+                    onValueChange={(v) => {
+                      const method = v as 'debit' | 'credit'
+                      const cardId =
+                        method === 'credit' ? form.card_account_id || creditCards[0]?.id || '' : ''
+                      setForm({
+                        ...form,
+                        payment_method: method,
+                        card_account_id: cardId,
+                        due_date:
+                          method === 'credit'
+                            ? previewDueDate(form.date, cardId) || form.due_date
+                            : '',
+                      })
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -443,6 +504,47 @@ export function TransactionsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              )}
+              {isCreditForm && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Cartão</Label>
+                    <Select
+                      value={form.card_account_id}
+                      onValueChange={(v) =>
+                        setForm({
+                          ...form,
+                          card_account_id: v,
+                          due_date: previewDueDate(form.date, v) || form.due_date,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={creditCards.length ? 'Selecione' : 'Cadastre um cartão'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {creditCards.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {creditCards.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Cadastre uma conta tipo cartão com fechamento e vencimento em Contas.
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Vencimento</Label>
+                    <DatePicker
+                      value={form.due_date}
+                      onChange={(due_date) => setForm({ ...form, due_date })}
+                      required
+                    />
+                  </div>
+                </>
               )}
               {form.type === 'transfer' && (
                 <div className="space-y-2">
@@ -711,7 +813,19 @@ export function TransactionsPage() {
                                 aria-label={`Selecionar ${tx.description}`}
                               />
                             </TableCell>
-                            <TableCell>{formatDate(tx.date)}</TableCell>
+                            <TableCell>
+                              {tx.payment_method === 'credit' && tx.due_date ? (
+                                <span className="whitespace-nowrap">
+                                  {formatDate(tx.date)}
+                                  <span className="text-muted-foreground">
+                                    {' '}
+                                    · vence {formatDate(tx.due_date)}
+                                  </span>
+                                </span>
+                              ) : (
+                                formatDate(tx.date)
+                              )}
+                            </TableCell>
                             <TableCell>{tx.description}</TableCell>
                             <TableCell>{categoryMap[tx.category_id] || '—'}</TableCell>
                             <TableCell>{accountMap[tx.account_id] || '—'}</TableCell>

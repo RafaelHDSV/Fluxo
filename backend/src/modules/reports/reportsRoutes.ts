@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { effectiveDateSql } from '../../lib/creditCycle.js'
 import { query, queryOne } from '../../lib/db.js'
 import { T } from '../../lib/tables.js'
 import { toNumber } from '../../lib/money.js'
@@ -6,6 +7,9 @@ import { requireAuth } from '../../middleware/auth.js'
 
 const router = Router()
 router.use(requireAuth)
+
+const EFF = effectiveDateSql()
+const EFF_T = effectiveDateSql('t')
 
 function currentMonthBounds() {
   const now = new Date()
@@ -70,7 +74,7 @@ router.get('/dashboard', async (req, res) => {
          when type = 'expense' and paid = true then -amount
          else 0 end), 0) as sum
        from ${T.transactions}
-       where user_id = $1 and date between $2::date and $3::date`,
+       where user_id = $1 and ${EFF} between $2::date and $3::date`,
       [userId, from, asOf],
     )
     openingBalance = accountBalance - toNumber(mtdNet?.sum)
@@ -87,7 +91,7 @@ router.get('/dashboard', async (req, res) => {
       coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense,
       coalesce(sum(case when type = 'adjustment' then amount else 0 end),0) as adjustments
      from ${T.transactions}
-     where user_id = $1 and date between $2 and $3`,
+     where user_id = $1 and ${EFF} between $2 and $3`,
     [userId, from, to],
   )
 
@@ -106,7 +110,7 @@ router.get('/dashboard', async (req, res) => {
     `select c.name, c.color, coalesce(sum(t.amount),0) as total
      from ${T.transactions} t
      join ${T.categories} c on c.id = t.category_id
-     where t.user_id = $1 and t.type = 'expense' and t.paid = true and t.date between $2 and $3
+     where t.user_id = $1 and t.type = 'expense' and t.paid = true and ${EFF_T} between $2 and $3
      group by c.name, c.color
      order by total desc
      limit 8`,
@@ -114,11 +118,11 @@ router.get('/dashboard', async (req, res) => {
   )
 
   const monthly = await query(
-    `select to_char(date_trunc('month', date), 'YYYY-MM') as month,
+    `select to_char(date_trunc('month', (${EFF})::timestamp), 'YYYY-MM') as month,
       coalesce(sum(case when type = 'income' then amount else 0 end),0) as income,
       coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense
      from ${T.transactions}
-     where user_id = $1 and date between $2 and $3
+     where user_id = $1 and ${EFF} between $2 and $3
      group by 1
      order by 1`,
     [userId, from, to],
@@ -128,15 +132,15 @@ router.get('/dashboard', async (req, res) => {
     `select d::text as date,
       ($4::numeric + sum(daily) over (order by d)) as result
      from (
-       select date::date as d,
+       select (${EFF})::date as d,
          coalesce(sum(case
            when type = 'income' then amount
            when type = 'expense' and paid = true then -amount
            when type = 'adjustment' then amount
            else 0 end), 0) as daily
        from ${T.transactions}
-       where user_id = $1 and date between $2 and $3
-       group by date::date
+       where user_id = $1 and ${EFF} between $2 and $3
+       group by (${EFF})::date
      ) s
      order by d`,
     [userId, from, to, cashflowOpening],
@@ -164,7 +168,7 @@ router.get('/dashboard', async (req, res) => {
         select sum(t.amount) from ${T.transactions} t
         where t.user_id = b.user_id and t.category_id = b.category_id and t.type = 'expense'
           and t.paid = true
-          and date_trunc('month', t.date::timestamp) = date_trunc('month', b.month::timestamp)
+          and date_trunc('month', (${EFF_T})::timestamp) = date_trunc('month', b.month::timestamp)
       ),0) as spent
      from ${T.budgets} b
      join ${T.categories} c on c.id = b.category_id
@@ -201,7 +205,7 @@ router.get('/dashboard', async (req, res) => {
       coalesce(sum(case when type = 'income' then amount else 0 end),0) as income,
       coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense
      from ${T.transactions}
-     where user_id = $1 and date between $2 and $3`,
+     where user_id = $1 and ${EFF} between $2 and $3`,
     [userId, prevFrom, prevTo],
   )
   const previousIncome = toNumber(prevAgg?.income)
@@ -214,7 +218,7 @@ router.get('/dashboard', async (req, res) => {
   const unpaidRow = await queryOne<{ count: string; total: string }>(
     `select count(*)::text as count, coalesce(sum(amount),0) as total
      from ${T.transactions}
-     where user_id = $1 and type = 'expense' and paid = false and date between $2 and $3`,
+     where user_id = $1 and type = 'expense' and paid = false and ${EFF} between $2 and $3`,
     [userId, bounds.period === 'all' ? from : bounds.from ?? fallback.from, bounds.period === 'all' ? to : bounds.to ?? fallback.to],
   )
 
@@ -255,11 +259,11 @@ router.get('/calendar', async (req, res) => {
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
   const months = await query<{ month: string; income: string; expense: string }>(
-    `select to_char(date_trunc('month', date), 'YYYY-MM') as month,
+    `select to_char(date_trunc('month', (${EFF})::timestamp), 'YYYY-MM') as month,
       coalesce(sum(case when type = 'income' then amount else 0 end),0) as income,
       coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense
      from ${T.transactions}
-     where user_id = $1 and date between $2 and $3
+     where user_id = $1 and ${EFF} between $2 and $3
      group by 1
      order by 1`,
     [req.userId, from, to],
@@ -321,7 +325,7 @@ router.get('/summary', async (req, res) => {
       coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense,
       count(*)::int as count
      from ${T.transactions}
-     where user_id = $1 and date between $2 and $3
+     where user_id = $1 and ${EFF} between $2 and $3
        and ($4::uuid is null or account_id = $4)
        and ($5::uuid is null or category_id = $5)
        and ($6::text is null or $6 = any(tags))`,
@@ -332,7 +336,7 @@ router.get('/summary', async (req, res) => {
     `select c.name, t.type, coalesce(sum(t.amount),0) as total
      from ${T.transactions} t
      join ${T.categories} c on c.id = t.category_id
-     where t.user_id = $1 and t.date between $2 and $3
+     where t.user_id = $1 and ${EFF_T} between $2 and $3
        and ($4::uuid is null or t.account_id = $4)
        and ($5::uuid is null or t.category_id = $5)
        and ($6::text is null or $6 = any(t.tags))
@@ -345,7 +349,7 @@ router.get('/summary', async (req, res) => {
     `select a.name, t.type, coalesce(sum(t.amount),0) as total
      from ${T.transactions} t
      join ${T.accounts} a on a.id = t.account_id
-     where t.user_id = $1 and t.date between $2 and $3
+     where t.user_id = $1 and ${EFF_T} between $2 and $3
        and ($4::uuid is null or t.account_id = $4)
        and ($5::uuid is null or t.category_id = $5)
        and ($6::text is null or $6 = any(t.tags))

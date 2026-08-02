@@ -30,6 +30,8 @@ type Category = { id: string; name: string }
 type Tx = {
   id: string
   date: string
+  due_date?: string | null
+  effective_date?: string | null
   description: string
   amount: string | number
   category_id: string
@@ -225,7 +227,7 @@ export function PayablesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Data</TableHead>
+                    <TableHead>Vencimento</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead>Categoria</TableHead>
                     <TableHead>Conta</TableHead>
@@ -237,7 +239,19 @@ export function PayablesPage() {
                 <TableBody>
                   {items.map((tx) => (
                     <TableRow key={tx.id}>
-                      <TableCell>{formatDate(tx.date)}</TableCell>
+                      <TableCell>
+                        {tx.payment_method === 'credit' && tx.due_date ? (
+                          <span className="whitespace-nowrap">
+                            {formatDate(tx.effective_date || tx.due_date)}
+                            <span className="text-muted-foreground">
+                              {' '}
+                              · compra {formatDate(tx.date)}
+                            </span>
+                          </span>
+                        ) : (
+                          formatDate(tx.effective_date || tx.date)
+                        )}
+                      </TableCell>
                       <TableCell>{tx.description}</TableCell>
                       <TableCell>{categoryMap[tx.category_id] || '—'}</TableCell>
                       <TableCell>{accountMap[tx.account_id] || '—'}</TableCell>

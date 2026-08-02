@@ -32,6 +32,7 @@ type Account = {
   type: string
   balance: string | number
   due_day?: number | null
+  closing_day?: number | null
   credit_limit?: string | number | null
 }
 
@@ -40,6 +41,7 @@ const emptyAccountForm = {
   type: 'checking',
   balance: '0',
   due_day: '',
+  closing_day: '',
   credit_limit: '',
 }
 
@@ -70,11 +72,13 @@ export function AccountsPage() {
 
   async function saveAccount(e: FormEvent) {
     e.preventDefault()
+    const isCard = form.type === 'credit_card'
     const payload = {
       name: form.name,
       type: form.type,
       balance: Number(form.balance),
-      due_day: form.due_day ? Number(form.due_day) : null,
+      due_day: isCard && form.due_day ? Number(form.due_day) : null,
+      closing_day: isCard && form.closing_day ? Number(form.closing_day) : null,
       credit_limit: form.credit_limit ? Number(form.credit_limit) : null,
     }
     if (editingId) await api.put(`/api/accounts/${editingId}`, payload)
@@ -91,9 +95,12 @@ export function AccountsPage() {
       type: a.type,
       balance: String(a.balance),
       due_day: a.due_day != null ? String(a.due_day) : '',
+      closing_day: a.closing_day != null ? String(a.closing_day) : '',
       credit_limit: a.credit_limit != null ? String(a.credit_limit) : '',
     })
   }
+
+  const isCardForm = form.type === 'credit_card'
 
   async function confirmArchive() {
     if (!archiveId) return
@@ -158,17 +165,36 @@ export function AccountsPage() {
                 onChange={(e) => setForm({ ...form, balance: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="acc-due">Vencimento (cartão)</Label>
-              <Input
-                id="acc-due"
-                type="number"
-                min={1}
-                max={31}
-                value={form.due_day}
-                onChange={(e) => setForm({ ...form, due_day: e.target.value })}
-              />
-            </div>
+            {isCardForm && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="acc-closing">Fechamento (cartão)</Label>
+                  <Input
+                    id="acc-closing"
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={form.closing_day}
+                    onChange={(e) => setForm({ ...form, closing_day: e.target.value })}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">Dia em que a fatura fecha (ex.: 28).</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="acc-due">Vencimento (cartão)</Label>
+                  <Input
+                    id="acc-due"
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={form.due_day}
+                    onChange={(e) => setForm({ ...form, due_day: e.target.value })}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">Dia do pagamento da fatura (ex.: 10).</p>
+                </div>
+              </>
+            )}
             <div className="space-y-2">
               <Label htmlFor="acc-limit">Limite</Label>
               <Input
@@ -215,6 +241,7 @@ export function AccountsPage() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead className="text-right">Saldo</TableHead>
+                    <TableHead>Fecha.</TableHead>
                     <TableHead>Venc.</TableHead>
                     <TableHead className="w-[88px]" />
                   </TableRow>
@@ -227,7 +254,8 @@ export function AccountsPage() {
                         <Badge variant="muted">{labelOf(accountTypeLabel, a.type)}</Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono tabular-nums">{formatBRL(a.balance)}</TableCell>
-                      <TableCell>{a.due_day ?? '—'}</TableCell>
+                      <TableCell>{a.type === 'credit_card' ? (a.closing_day ?? '—') : '—'}</TableCell>
+                      <TableCell>{a.type === 'credit_card' ? (a.due_day ?? '—') : '—'}</TableCell>
                       <TableCell>
                         <div className="flex gap-1">
                           <Button

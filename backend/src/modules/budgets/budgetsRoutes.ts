@@ -1,7 +1,10 @@
 import { Router } from 'express'
+import { effectiveDateSql } from '../../lib/creditCycle.js'
 import { query, queryOne } from '../../lib/db.js'
 import { T } from '../../lib/tables.js'
 import { requireAuth } from '../../middleware/auth.js'
+
+const EFF_T = effectiveDateSql('t')
 
 const router = Router()
 router.use(requireAuth)
@@ -21,7 +24,7 @@ router.get('/', async (req, res) => {
         where t.user_id = b.user_id
           and t.category_id = b.category_id
           and t.type = 'expense'
-          and date_trunc('month', t.date::timestamp) = date_trunc('month', b.month::timestamp)
+          and date_trunc('month', (${EFF_T})::timestamp) = date_trunc('month', b.month::timestamp)
       ), 0) as spent
      from ${T.budgets} b
      join ${T.categories} c on c.id = b.category_id

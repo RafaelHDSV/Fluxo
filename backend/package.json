@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "tsx src/modules/imports/parsers.test.ts",
+    "test": "tsx src/modules/imports/parsers.test.ts && tsx src/lib/creditCycle.test.ts",
     "import:notion": "tsx scripts/import-notion.ts",
     "format": "prettier --write src/"
   },

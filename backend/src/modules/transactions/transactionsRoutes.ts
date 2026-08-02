@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { computeCreditDueDate, effectiveDateSql } from '../../lib/creditCycle.js'
 import { query, queryOne } from '../../lib/db.js'
 import { buildDedupeHash, toNumber } from '../../lib/money.js'
 import { T } from '../../lib/tables.js'
@@ -7,6 +8,8 @@ import { suggestCategoryId } from '../categories/suggestCategory.js'
 
 const router = Router()
 router.use(requireAuth)
+
+const EFF = effectiveDateSql()
 
 function parsePaid(value: unknown): boolean | null {
   if (value === true || value === 'true') return true
@@ -19,6 +22,49 @@ function parsePaymentMethod(value: unknown): 'debit' | 'credit' | null | undefin
   if (value === null || value === '') return null
   if (value === 'debit' || value === 'credit') return value
   return undefined
+}
+
+async function resolveDueDate(input: {
+  userId: string
+  paymentMethod: string | null
+  purchaseDate: string
+  cardAccountId: string | null
+  dueDateOverride?: string | null
+}): Promise<{ due_date: string | null; card_account_id: string | null; error?: string }> {
+  if (input.paymentMethod !== 'credit') {
+    return { due_date: null, card_account_id: null }
+  }
+  if (!input.cardAccountId) {
+    return { due_date: null, card_account_id: null, error: 'card_account_id é obrigatório para crédito' }
+  }
+  const card = await queryOne<{
+    id: string
+    type: string
+    due_day: number | null
+    closing_day: number | null
+  }>(`select id, type, due_day, closing_day from ${T.accounts} where id = $1 and user_id = $2`, [
+    input.cardAccountId,
+    input.userId,
+  ])
+  if (!card || card.type !== 'credit_card') {
+    return { due_date: null, card_account_id: null, error: 'Conta cartão inválida' }
+  }
+  if (card.due_day == null || card.closing_day == null) {
+    return {
+      due_date: null,
+      card_account_id: null,
+      error: 'Cartão precisa de dia de fechamento e vencimento',
+    }
+  }
+  if (input.dueDateOverride) {
+    return { due_date: input.dueDateOverride.slice(0, 10), card_account_id: input.cardAccountId }
+  }
+  try {
+    const due_date = computeCreditDueDate(input.purchaseDate, card.closing_day, card.due_day)
+    return { due_date, card_account_id: input.cardAccountId }
+  } catch {
+    return { due_date: null, card_account_id: null, error: 'Não foi possível calcular o vencimento' }
+  }
 }
 
 router.get('/', async (req, res) => {
@@ -44,11 +90,11 @@ router.get('/', async (req, res) => {
   }
   if (typeof from === 'string' && from) {
     params.push(from)
-    where.push(`date >= $${params.length}`)
+    where.push(`${EFF} >= $${params.length}`)
   }
   if (typeof to === 'string' && to) {
     params.push(to)
-    where.push(`date <= $${params.length}`)
+    where.push(`${EFF} <= $${params.length}`)
   }
   const paidFilter = parsePaid(paid)
   if (paidFilter !== null) {
@@ -74,9 +120,10 @@ router.get('/', async (req, res) => {
   const limitIdx = params.length + 1
   const offsetIdx = params.length + 2
   const rows = await query(
-    `select * from ${T.transactions}
+    `select *, (${EFF})::text as effective_date
+     from ${T.transactions}
      where ${where.join(' and ')}
-     order by date desc, created_at desc
+     order by ${EFF} desc, created_at desc
      limit $${limitIdx} offset $${offsetIdx}`,
     [...params, limit, offset],
   )
@@ -109,6 +156,7 @@ router.post('/', async (req, res) => {
   if (body.payment_method !== undefined && paymentMethod === undefined) {
     return res.status(400).json({ error: 'payment_method inválido (debit|credit)' })
   }
+  const resolvedMethod = paymentMethod === undefined ? null : paymentMethod
 
   let categoryId = category_id as string | undefined
   if (!categoryId) {
@@ -116,6 +164,17 @@ router.post('/', async (req, res) => {
   }
   if (!categoryId) {
     return res.status(400).json({ error: 'category_id é obrigatório (sem categoria padrão)' })
+  }
+
+  const dueResolved = await resolveDueDate({
+    userId: req.userId!,
+    paymentMethod: resolvedMethod,
+    purchaseDate: String(date).slice(0, 10),
+    cardAccountId: card_account_id ?? null,
+    dueDateOverride: typeof body.due_date === 'string' ? body.due_date : null,
+  })
+  if (dueResolved.error) {
+    return res.status(400).json({ error: dueResolved.error })
   }
 
   const paid = parsePaid(body.paid) ?? true
@@ -133,9 +192,9 @@ router.post('/', async (req, res) => {
     const row = await queryOne(
       `insert into ${T.transactions}
         (user_id, date, description, amount, type, category_id, account_id, transfer_account_id,
-         card_account_id, tags, notes, dedupe_hash, external_fitid, paid, payment_method, source_ref)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-       returning *`,
+         card_account_id, tags, notes, dedupe_hash, external_fitid, paid, payment_method, source_ref, due_date)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+       returning *, (${EFF})::text as effective_date`,
       [
         req.userId,
         date,
@@ -145,14 +204,15 @@ router.post('/', async (req, res) => {
         categoryId,
         account_id,
         transfer_account_id ?? null,
-        card_account_id ?? null,
+        dueResolved.card_account_id,
         tags,
         notes ?? null,
         dedupe_hash,
         external_fitid ?? null,
         paid,
-        paymentMethod === undefined ? null : paymentMethod,
+        resolvedMethod,
         source_ref ?? null,
+        dueResolved.due_date,
       ],
     )
     res.status(201).json(row)
@@ -177,6 +237,8 @@ router.put('/:id', async (req, res) => {
     paid: boolean
     payment_method: string | null
     source_ref: string | null
+    card_account_id: string | null
+    due_date: string | null
   }>(`select * from ${T.transactions} where id = $1 and user_id = $2`, [req.params.id, req.userId])
 
   if (!existing) return res.status(404).json({ error: 'Transação não encontrada' })
@@ -195,6 +257,49 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'payment_method inválido (debit|credit)' })
     }
     payment_method = parsed
+  }
+
+  const cardAccountId =
+    body.card_account_id !== undefined ? body.card_account_id : existing.card_account_id
+
+  let finalDue: string | null = null
+  let finalCard: string | null = null
+
+  if (payment_method === 'credit') {
+    const creditFieldsTouched =
+      body.date !== undefined ||
+      body.card_account_id !== undefined ||
+      body.payment_method !== undefined ||
+      body.due_date !== undefined
+
+    // Crédito legado (sem cartão): permite update de paid/notas sem forçar ciclo
+    if (!cardAccountId && !creditFieldsTouched) {
+      finalDue = existing.due_date
+      finalCard = existing.card_account_id
+    } else {
+      const explicitDue =
+        body.due_date !== undefined
+          ? body.due_date
+            ? String(body.due_date).slice(0, 10)
+            : null
+          : null
+      const shouldRecalc =
+        body.due_date === undefined &&
+        (body.date !== undefined || body.card_account_id !== undefined || body.payment_method !== undefined)
+
+      const dueResolved = await resolveDueDate({
+        userId: req.userId!,
+        paymentMethod: payment_method,
+        purchaseDate: String(date).slice(0, 10),
+        cardAccountId: cardAccountId ?? null,
+        dueDateOverride: body.due_date !== undefined ? explicitDue : shouldRecalc ? null : existing.due_date,
+      })
+      if (dueResolved.error) {
+        return res.status(400).json({ error: dueResolved.error })
+      }
+      finalDue = dueResolved.due_date
+      finalCard = dueResolved.card_account_id
+    }
   }
 
   const source_ref = body.source_ref !== undefined ? body.source_ref : existing.source_ref
@@ -217,7 +322,7 @@ router.put('/:id', async (req, res) => {
       category_id = coalesce($7, category_id),
       account_id = $8,
       transfer_account_id = coalesce($9, transfer_account_id),
-      card_account_id = coalesce($10, card_account_id),
+      card_account_id = $10,
       tags = coalesce($11, tags),
       notes = coalesce($12, notes),
       dedupe_hash = $13,
@@ -225,9 +330,10 @@ router.put('/:id', async (req, res) => {
       paid = $15,
       payment_method = $16,
       source_ref = $17,
+      due_date = $18,
       updated_at = now()
      where id = $1 and user_id = $2
-     returning *`,
+     returning *, (${EFF})::text as effective_date`,
     [
       req.params.id,
       req.userId,
@@ -238,7 +344,7 @@ router.put('/:id', async (req, res) => {
       body.category_id ?? null,
       account_id,
       body.transfer_account_id ?? null,
-      body.card_account_id ?? null,
+      finalCard,
       body.tags ?? null,
       body.notes ?? null,
       dedupe_hash,
@@ -246,6 +352,7 @@ router.put('/:id', async (req, res) => {
       paid,
       payment_method,
       source_ref ?? null,
+      finalDue,
     ],
   )
   res.json(row)
