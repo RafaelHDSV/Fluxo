@@ -813,22 +813,34 @@ export function TransactionsPage() {
                                 aria-label={`Selecionar ${tx.description}`}
                               />
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="whitespace-nowrap">
                               {tx.payment_method === 'credit' && tx.due_date ? (
-                                <span className="whitespace-nowrap">
+                                <>
                                   {formatDate(tx.date)}
                                   <span className="text-muted-foreground">
                                     {' '}
                                     · vence {formatDate(tx.due_date)}
                                   </span>
-                                </span>
+                                </>
                               ) : (
                                 formatDate(tx.date)
                               )}
                             </TableCell>
-                            <TableCell>{tx.description}</TableCell>
-                            <TableCell>{categoryMap[tx.category_id] || '—'}</TableCell>
-                            <TableCell>{accountMap[tx.account_id] || '—'}</TableCell>
+                            <TableCell className="max-w-[220px]">
+                              <span className="block truncate" title={tx.description}>
+                                {tx.description}
+                              </span>
+                            </TableCell>
+                            <TableCell className="max-w-[140px]">
+                              <span className="block truncate" title={categoryMap[tx.category_id] || undefined}>
+                                {categoryMap[tx.category_id] || '—'}
+                              </span>
+                            </TableCell>
+                            <TableCell className="max-w-[120px]">
+                              <span className="block truncate" title={accountMap[tx.account_id] || undefined}>
+                                {accountMap[tx.account_id] || '—'}
+                              </span>
+                            </TableCell>
                             <TableCell>
                               <Badge variant="muted">{labelOf(transactionTypeLabel, tx.type)}</Badge>
                             </TableCell>
@@ -858,7 +870,7 @@ export function TransactionsPage() {
                             )}
                             <TableCell
                               className={cn(
-                                'text-right font-mono tabular-nums',
+                                'whitespace-nowrap text-right font-mono tabular-nums',
                                 tx.type === 'income' && 'text-primary',
                                 tx.type === 'expense' && 'text-destructive',
                               )}

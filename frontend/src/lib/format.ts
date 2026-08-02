@@ -5,14 +5,14 @@ export function formatBRL(value: number | string) {
   )
 }
 
-/** Valor com sinal explícito: receita +, despesa −. */
+/** Valor com sinal explícito: receita +, despesa − (NBSP evita quebra de linha). */
 export function formatSignedBRL(
   value: number | string,
   type: 'income' | 'expense' | 'transfer' | 'adjustment' | string,
 ) {
   const formatted = formatBRL(value)
-  if (type === 'income') return `+${formatted}`
-  if (type === 'expense') return `-${formatted}`
+  if (type === 'income') return `+\u00A0${formatted}`
+  if (type === 'expense') return `-\u00A0${formatted}`
   return formatted
 }
 
