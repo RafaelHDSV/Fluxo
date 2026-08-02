@@ -27,7 +27,7 @@ Fluxo é um controle financeiro pessoal web: entradas, saídas, contas, categori
 
 | Servico | Porta / URL |
 |---------|-------------|
-| Front | http://localhost:5173 |
+| Front | http://localhost:3333 |
 | API | http://localhost:3693 |
 
 ---
