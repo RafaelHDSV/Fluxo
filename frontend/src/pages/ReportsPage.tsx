@@ -1,7 +1,29 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { formatBRL, todayISO } from '../lib/format'
-import { api } from '../services/api'
-import styles from './Page.module.scss'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { formatBRL, formatMonth, todayISO } from '@/lib/format'
+import { labelOf, transactionTypeLabel } from '@/lib/labels'
+import { api } from '@/services/api'
+import { cn } from '@/lib/utils'
 
 type Account = { id: string; name: string }
 type Category = { id: string; name: string }
@@ -12,7 +34,23 @@ type Summary = {
   byAccount: Array<{ name: string; type: string; total: string | number }>
 }
 
+type CalendarMonth = {
+  month: string
+  label: string
+  income: number
+  expense: number
+  result: number
+  isCurrent: boolean
+}
+
+type CalendarReport = {
+  year: number
+  months: CalendarMonth[]
+  totals: { income: number; expense: number; result: number }
+}
+
 export function ReportsPage() {
+  const currentYear = new Date().getFullYear()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [filters, setFilters] = useState({
@@ -23,6 +61,10 @@ export function ReportsPage() {
     tag: '',
   })
   const [summary, setSummary] = useState<Summary | null>(null)
+  const [calendarYear, setCalendarYear] = useState(currentYear)
+  const [calendar, setCalendar] = useState<CalendarReport | null>(null)
+  const [loadingCalendar, setLoadingCalendar] = useState(true)
+  const [loadingSummary, setLoadingSummary] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -34,8 +76,19 @@ export function ReportsPage() {
       .catch((e) => setError(e instanceof Error ? e.message : 'Erro'))
   }, [])
 
+  useEffect(() => {
+    setLoadingCalendar(true)
+    api
+      .get<CalendarReport>(`/api/reports/calendar?year=${calendarYear}`)
+      .then(setCalendar)
+      .catch((e) => setError(e instanceof Error ? e.message : 'Erro no calendário'))
+      .finally(() => setLoadingCalendar(false))
+  }, [calendarYear])
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
+    setLoadingSummary(true)
+    setError('')
     const params = new URLSearchParams()
     params.set('from', filters.from)
     params.set('to', filters.to)
@@ -46,141 +99,286 @@ export function ReportsPage() {
       setSummary(await api.get<Summary>(`/api/reports/summary?${params}`))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro')
+    } finally {
+      setLoadingSummary(false)
     }
   }
 
-  return (
-    <div>
-      <header className={styles.header}>
-        <div>
-          <h1>Relatórios</h1>
-          <p>Análise por período, conta, categoria e tag.</p>
-        </div>
-      </header>
-      {error && <p className={styles.error}>{error}</p>}
+  const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
 
-      <section className={styles.panel}>
-        <form onSubmit={onSubmit} className={styles.formRow}>
-          <label>
-            De
-            <input
-              type="date"
-              value={filters.from}
-              onChange={(e) => setFilters({ ...filters, from: e.target.value })}
-            />
-          </label>
-          <label>
-            Até
-            <input
-              type="date"
-              value={filters.to}
-              onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-            />
-          </label>
-          <label>
-            Conta
-            <select
-              value={filters.account_id}
-              onChange={(e) => setFilters({ ...filters, account_id: e.target.value })}
-            >
-              <option value="">Todas</option>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Categoria
-            <select
-              value={filters.category_id}
-              onChange={(e) => setFilters({ ...filters, category_id: e.target.value })}
-            >
-              <option value="">Todas</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Tag
-            <input
-              value={filters.tag}
-              onChange={(e) => setFilters({ ...filters, tag: e.target.value })}
-              placeholder="opcional"
-            />
-          </label>
-          <div style={{ alignSelf: 'end' }}>
-            <button className="primary" type="submit">
-              Gerar
-            </button>
+  return (
+    <div className="space-y-6">
+      <header>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">Relatórios</h1>
+        <p className="text-muted-foreground">Análise por período, conta, categoria e calendário anual.</p>
+      </header>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Calendário {calendarYear}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-2">
+              <Label>Ano</Label>
+              <Select
+                value={String(calendarYear)}
+                onValueChange={(v) => setCalendarYear(Number(v))}
+              >
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        </form>
-      </section>
+
+          {loadingCalendar ? (
+            <Skeleton className="h-48 w-full" />
+          ) : calendar ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {calendar.months.map((m) => (
+                  <div
+                    key={m.month}
+                    className={cn(
+                      'rounded-lg border border-border p-3 text-sm',
+                      m.isCurrent && 'border-primary/50 bg-primary/5',
+                    )}
+                  >
+                    <div className="mb-2 flex items-center justify-between">
+                      <strong>{m.label}</strong>
+                      {m.isCurrent && <Badge variant="success">Atual</Badge>}
+                    </div>
+                    <div className="space-y-1 text-muted-foreground">
+                      <div className="flex justify-between">
+                        <span>Receitas</span>
+                        <span className="font-mono tabular-nums text-primary">{formatBRL(m.income)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Despesas</span>
+                        <span className="font-mono tabular-nums text-destructive">{formatBRL(m.expense)}</span>
+                      </div>
+                      <div className="flex justify-between border-t border-border pt-1 font-medium text-foreground">
+                        <span>Resultado</span>
+                        <span
+                          className={cn(
+                            'font-mono tabular-nums',
+                            m.result >= 0 ? 'text-primary' : 'text-destructive',
+                          )}
+                        >
+                          {formatBRL(m.result)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
+                <div>
+                  <p className="text-sm text-muted-foreground">Receitas anuais</p>
+                  <p className="font-mono text-lg tabular-nums text-primary">{formatBRL(calendar.totals.income)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Despesas anuais</p>
+                  <p className="font-mono text-lg tabular-nums text-destructive">
+                    {formatBRL(calendar.totals.expense)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Resultado anual</p>
+                  <p
+                    className={cn(
+                      'font-mono text-lg tabular-nums',
+                      calendar.totals.result >= 0 ? 'text-primary' : 'text-destructive',
+                    )}
+                  >
+                    {formatBRL(calendar.totals.result)}
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">Sem dados para este ano.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Resumo por período</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <div className="space-y-2">
+              <Label htmlFor="rep-from">De</Label>
+              <Input
+                id="rep-from"
+                type="date"
+                value={filters.from}
+                onChange={(e) => setFilters({ ...filters, from: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rep-to">Até</Label>
+              <Input
+                id="rep-to"
+                type="date"
+                value={filters.to}
+                onChange={(e) => setFilters({ ...filters, to: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Conta</Label>
+              <Select
+                value={filters.account_id || 'all'}
+                onValueChange={(v) => setFilters({ ...filters, account_id: v === 'all' ? '' : v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select
+                value={filters.category_id || 'all'}
+                onValueChange={(v) => setFilters({ ...filters, category_id: v === 'all' ? '' : v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rep-tag">Tag</Label>
+              <Input
+                id="rep-tag"
+                value={filters.tag}
+                onChange={(e) => setFilters({ ...filters, tag: e.target.value })}
+                placeholder="opcional"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button type="submit" disabled={loadingSummary}>
+                {loadingSummary ? 'Gerando…' : 'Gerar'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       {summary && (
         <>
-          <div className={styles.grid}>
-            <article className={styles.panel}>
-              <p>Receitas</p>
-              <p className="money">{formatBRL(summary.totals.income)}</p>
-            </article>
-            <article className={styles.panel}>
-              <p>Despesas</p>
-              <p className="money">{formatBRL(summary.totals.expense)}</p>
-            </article>
-            <article className={styles.panel}>
-              <p>Lançamentos</p>
-              <p className="money">{summary.totals.count}</p>
-            </article>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Receitas</p>
+                <p className="font-mono text-xl tabular-nums text-primary">{formatBRL(summary.totals.income)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatMonth(summary.period.from.slice(0, 7), 'long')} — {formatMonth(summary.period.to.slice(0, 7), 'long')}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Despesas</p>
+                <p className="font-mono text-xl tabular-nums text-destructive">
+                  {formatBRL(summary.totals.expense)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Lançamentos</p>
+                <p className="font-mono text-xl tabular-nums">{summary.totals.count}</p>
+              </CardContent>
+            </Card>
           </div>
 
-          <section className={styles.panel}>
-            <h3>Por categoria</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Categoria</th>
-                  <th>Tipo</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {summary.byCategory.map((row) => (
-                  <tr key={`${row.name}-${row.type}`}>
-                    <td>{row.name}</td>
-                    <td>{row.type}</td>
-                    <td className="money">{formatBRL(row.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Por categoria</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {summary.byCategory.map((row) => (
+                      <TableRow key={`${row.name}-${row.type}`}>
+                        <TableCell>{row.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="muted">{labelOf(transactionTypeLabel, row.type)}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">{formatBRL(row.total)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
 
-          <section className={styles.panel}>
-            <h3>Por conta</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Conta</th>
-                  <th>Tipo</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {summary.byAccount.map((row) => (
-                  <tr key={`${row.name}-${row.type}`}>
-                    <td>{row.name}</td>
-                    <td>{row.type}</td>
-                    <td className="money">{formatBRL(row.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Por conta</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Conta</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {summary.byAccount.map((row) => (
+                      <TableRow key={`${row.name}-${row.type}`}>
+                        <TableCell>{row.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="muted">{labelOf(transactionTypeLabel, row.type)}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">{formatBRL(row.total)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

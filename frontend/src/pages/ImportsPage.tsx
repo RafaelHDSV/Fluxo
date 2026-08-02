@@ -1,7 +1,27 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { formatBRL } from '../lib/format'
-import { api } from '../services/api'
-import styles from './Page.module.scss'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { formatBRL, formatDate } from '@/lib/format'
+import { labelOf, transactionTypeLabel } from '@/lib/labels'
+import { api } from '@/services/api'
 
 type Account = { id: string; name: string }
 type ImportRow = {
@@ -22,6 +42,7 @@ export function ImportsPage() {
   const [rows, setRows] = useState<ImportRow[]>([])
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [pending, setPending] = useState(false)
 
   useEffect(() => {
     api
@@ -38,98 +59,131 @@ export function ImportsPage() {
     if (!file) return
     setError('')
     setMessage('')
-    const form = new FormData()
-    form.append('file', file)
-    form.append('account_id', accountId)
-    const result = await api.upload<{ import: { id: string }; rows: ImportRow[] }>(
-      '/api/imports/preview',
-      form,
-    )
-    setImportId(result.import.id)
-    setRows(result.rows)
-    setMessage(`${result.rows.length} linhas lidas. Revise e confirme.`)
+    setPending(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('account_id', accountId)
+      const result = await api.upload<{ import: { id: string }; rows: ImportRow[] }>(
+        '/api/imports/preview',
+        form,
+      )
+      setImportId(result.import.id)
+      setRows(result.rows)
+      setMessage(`${result.rows.length} linhas lidas. Revise e confirme.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro no preview')
+    } finally {
+      setPending(false)
+    }
   }
 
   async function onCommit() {
     if (!importId) return
-    const result = await api.post<{ created: number; skipped: number }>(
-      `/api/imports/${importId}/commit`,
-      {},
-    )
-    setMessage(`Importação concluída: ${result.created} criadas, ${result.skipped} ignoradas.`)
+    setPending(true)
+    try {
+      const result = await api.post<{ created: number; skipped: number }>(
+        `/api/imports/${importId}/commit`,
+        {},
+      )
+      setMessage(`Importação concluída: ${result.created} criadas, ${result.skipped} ignoradas.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao confirmar')
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
-    <div>
-      <header className={styles.header}>
-        <div>
-          <h1>Importações</h1>
-          <p>CSV e OFX com preview, mapeamento automático e dedupe.</p>
-        </div>
+    <div className="space-y-6">
+      <header>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">Importações</h1>
+        <p className="text-muted-foreground">CSV e OFX com preview, mapeamento automático e dedupe.</p>
       </header>
 
-      <section className={styles.panel}>
-        <form onSubmit={onPreview} className={styles.formRow}>
-          <label>
-            Conta destino
-            <select value={accountId} onChange={(e) => setAccountId(e.target.value)} required>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Arquivo
-            <input
-              type="file"
-              accept=".csv,.ofx,text/csv"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              required
-            />
-          </label>
-          <div style={{ alignSelf: 'end' }}>
-            <button className="primary" type="submit">
-              Pré-visualizar
-            </button>
-          </div>
-        </form>
-        {error && <p className={styles.error}>{error}</p>}
-        {message && <p>{message}</p>}
-      </section>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Enviar arquivo</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onPreview} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-2">
+              <Label>Conta destino</Label>
+              <Select value={accountId} onValueChange={setAccountId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="import-file">Arquivo</Label>
+              <Input
+                id="import-file"
+                type="file"
+                accept=".csv,.ofx,text/csv"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                required
+              />
+            </div>
+            <div className="flex items-end">
+              <Button type="submit" disabled={pending}>
+                {pending ? 'Processando…' : 'Pré-visualizar'}
+              </Button>
+            </div>
+          </form>
+          {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+          {message && <p className="mt-3 text-sm text-primary">{message}</p>}
+        </CardContent>
+      </Card>
 
       {rows.length > 0 && (
-        <section className={styles.panel}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <h3>Preview</h3>
-            <button className="primary" type="button" onClick={onCommit}>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base">Preview</CardTitle>
+            <Button type="button" disabled={pending} onClick={onCommit}>
               Confirmar importação
-            </button>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Descrição</th>
-                <th>Tipo</th>
-                <th>Valor</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td>{String(r.date).slice(0, 10)}</td>
-                  <td>{r.description}</td>
-                  <td>{r.type}</td>
-                  <td className="money">{formatBRL(r.amount)}</td>
-                  <td>{r.is_duplicate ? 'Duplicada' : 'Nova'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell>{formatDate(r.date)}</TableCell>
+                      <TableCell>{r.description}</TableCell>
+                      <TableCell>
+                        <Badge variant="muted">{labelOf(transactionTypeLabel, r.type)}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono tabular-nums">{formatBRL(r.amount)}</TableCell>
+                      <TableCell>
+                        <Badge variant={r.is_duplicate ? 'warning' : 'success'}>
+                          {r.is_duplicate ? 'Duplicada' : 'Nova'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

@@ -10,6 +10,7 @@ import importsRoutes from './modules/imports/importsRoutes.js'
 import budgetsRoutes from './modules/budgets/budgetsRoutes.js'
 import goalsRoutes from './modules/goals/goalsRoutes.js'
 import reportsRoutes from './modules/reports/reportsRoutes.js'
+import wishlistRoutes from './modules/wishlist/wishlistRoutes.js'
 
 const app = express()
 
@@ -29,6 +30,7 @@ app.use('/api/transactions', transactionsRoutes)
 app.use('/api/imports', importsRoutes)
 app.use('/api/budgets', budgetsRoutes)
 app.use('/api/goals', goalsRoutes)
+app.use('/api/wishlist', wishlistRoutes)
 app.use('/api/reports', reportsRoutes)
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

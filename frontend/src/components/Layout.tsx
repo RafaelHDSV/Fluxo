@@ -1,59 +1,152 @@
+import { Moon, Sun } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
-import styles from './Layout.module.scss'
+import { useEffect, useState } from 'react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { useAuth } from '@/hooks/useAuth'
+import { useTheme } from '@/hooks/useTheme'
+import { api } from '@/services/api'
+import { cn } from '@/lib/utils'
 
 const links = [
-  { to: '/', label: 'Dashboard' },
+  { to: '/', label: 'Painel' },
   { to: '/transactions', label: 'Transações' },
+  { to: '/a-pagar', label: 'A pagar' },
   { to: '/imports', label: 'Importações' },
   { to: '/accounts', label: 'Contas' },
   { to: '/budgets', label: 'Orçamentos' },
   { to: '/goals', label: 'Metas' },
+  { to: '/wishlist', label: 'Wishlist' },
   { to: '/reports', label: 'Relatórios' },
 ]
 
+const mobilePrimary = ['/', '/transactions', '/a-pagar', '/accounts', '/more']
+
 export function Layout() {
   const { user, signOut } = useAuth()
+  const { theme, toggleTheme } = useTheme()
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [unpaidCount, setUnpaidCount] = useState(0)
+
+  useEffect(() => {
+    api
+      .get<{ unpaidCount?: number }>('/api/reports/dashboard')
+      .then((d) => setUnpaidCount(d.unpaidCount ?? 0))
+      .catch(() => setUnpaidCount(0))
+  }, [])
 
   return (
-    <div className={styles.shell}>
-      <aside className={styles.sidebar}>
-        <div className={styles.brand}>
+    <div className="min-h-screen bg-background text-foreground lg:grid lg:grid-cols-[260px_1fr]">
+      <aside className="hidden border-r border-border bg-surface lg:flex lg:flex-col lg:gap-6 lg:p-5">
+        <div className="flex items-center gap-3">
           <img src="/logo.svg" alt="" width={36} height={36} />
           <div>
-            <strong>Fluxo</strong>
-            <span>Veja seu dinheiro com clareza.</span>
+            <strong className="font-display text-lg">Fluxo</strong>
+            <p className="text-xs text-muted-foreground">Veja seu dinheiro com clareza.</p>
           </div>
         </div>
-        <nav className={styles.nav}>
+        <nav className="flex flex-1 flex-col gap-1">
           {links.map((link) => (
             <NavLink
               key={link.to}
               to={link.to}
               end={link.to === '/'}
-              className={({ isActive }) => (isActive ? styles.active : undefined)}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground',
+                  isActive && 'bg-muted text-foreground',
+                )
+              }
             >
-              {link.label}
+              <span>{link.label}</span>
+              {link.to === '/a-pagar' && unpaidCount > 0 && (
+                <Badge variant="warning">{unpaidCount}</Badge>
+              )}
             </NavLink>
           ))}
         </nav>
-        <div className={styles.footer}>
-          <p>{user?.email}</p>
-          <button type="button" onClick={() => signOut()}>
+        <div className="space-y-3 border-t border-border pt-4">
+          <Button type="button" variant="outline" className="w-full justify-start gap-2" onClick={toggleTheme}>
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            Tema {theme === 'dark' ? 'claro' : 'escuro'}
+          </Button>
+          <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+          <Button type="button" variant="secondary" className="w-full" onClick={() => signOut()}>
             Sair
-          </button>
+          </Button>
         </div>
       </aside>
-      <main className={styles.main}>
+
+      <main className="min-w-0 px-4 pb-24 pt-5 lg:px-8 lg:pb-8 lg:pt-8">
         <Outlet />
       </main>
-      <nav className={styles.mobileNav}>
-        {links.slice(0, 5).map((link) => (
-          <NavLink key={link.to} to={link.to} end={link.to === '/'}>
-            {link.label}
-          </NavLink>
-        ))}
+
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-surface/95 backdrop-blur lg:hidden">
+        {mobilePrimary.map((to) => {
+          if (to === '/more') {
+            return (
+              <button
+                key="more"
+                type="button"
+                className="flex flex-col items-center gap-1 px-1 py-2 text-[11px] text-muted-foreground"
+                onClick={() => setMoreOpen((v) => !v)}
+              >
+                Mais
+              </button>
+            )
+          }
+          const link = links.find((l) => l.to === to)!
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) =>
+                cn(
+                  'relative flex flex-col items-center gap-1 px-1 py-2 text-[11px] text-muted-foreground',
+                  isActive && 'text-primary',
+                )
+              }
+            >
+              <span>{link.label}</span>
+              {to === '/a-pagar' && unpaidCount > 0 && (
+                <span className="absolute right-2 top-1 rounded-full bg-warning px-1.5 text-[10px] font-bold text-primary-foreground">
+                  {unpaidCount}
+                </span>
+              )}
+            </NavLink>
+          )
+        })}
       </nav>
+
+      {moreOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button type="button" className="absolute inset-0 bg-black/50" onClick={() => setMoreOpen(false)} />
+          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border border-border bg-surface p-4 pb-8">
+            <p className="mb-3 font-display text-lg">Navegação</p>
+            <div className="grid gap-2">
+              {links.map((link) => (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  end={link.to === '/'}
+                  onClick={() => setMoreOpen(false)}
+                  className="rounded-lg bg-muted px-3 py-3 text-sm font-medium"
+                >
+                  {link.label}
+                  {link.to === '/a-pagar' && unpaidCount > 0 ? ` (${unpaidCount})` : ''}
+                </NavLink>
+              ))}
+              <Button type="button" variant="outline" onClick={toggleTheme}>
+                Alternar tema ({theme})
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => signOut()}>
+                Sair
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

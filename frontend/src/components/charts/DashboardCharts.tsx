@@ -1,21 +1,55 @@
 import ReactECharts from 'echarts-for-react'
-import { formatBRL } from '../../lib/format'
+import { Skeleton } from '@/components/ui/skeleton'
+import { formatBRL, formatDate, formatMonth } from '@/lib/format'
 
 type Props = {
   monthly: Array<{ month: string; income: string | number; expense: string | number }>
   byCategory: Array<{ name: string; color?: string; total: string | number }>
   balanceSeries: Array<{ date: string; balance: string | number }>
+  loading?: boolean
 }
 
-export function DashboardCharts({ monthly, byCategory, balanceSeries }: Props) {
+function EmptyChart({ title, message }: { title: string; message: string }) {
+  return (
+    <div className="flex h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 px-4 text-center">
+      <h3 className="mb-2 font-medium">{title}</h3>
+      <p className="text-sm text-muted-foreground">{message}</p>
+    </div>
+  )
+}
+
+export function DashboardCharts({ monthly, byCategory, balanceSeries, loading }: Props) {
+  if (loading) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Skeleton className="h-[320px] w-full" />
+        <Skeleton className="h-[320px] w-full" />
+        <Skeleton className="col-span-full h-[300px] w-full" />
+      </div>
+    )
+  }
+
+  const hasMonthly = monthly.some((m) => Number(m.income) > 0 || Number(m.expense) > 0)
+  const hasCategory = byCategory.some((c) => Number(c.total) > 0)
+  const hasBalance = balanceSeries.length > 0
+
   const bars = {
     backgroundColor: 'transparent',
     textStyle: { color: '#8b9aab' },
-    tooltip: { trigger: 'axis' },
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: Array<{ seriesName: string; value: number }>) =>
+        params
+          .map((p) => `${p.seriesName}: ${formatBRL(p.value)}`)
+          .join('<br/>'),
+    },
     legend: { data: ['Receitas', 'Despesas'], textStyle: { color: '#8b9aab' } },
-    grid: { left: 40, right: 16, top: 40, bottom: 30 },
-    xAxis: { type: 'category', data: monthly.map((m) => m.month) },
-    yAxis: { type: 'value', axisLabel: { formatter: (v: number) => `${Math.round(v / 1000)}k` } },
+    grid: { left: 48, right: 16, top: 40, bottom: 30 },
+    xAxis: { type: 'category', data: monthly.map((m) => formatMonth(m.month)) },
+    yAxis: {
+      type: 'value',
+      axisLabel: { formatter: (v: number) => formatBRL(v).replace(/\s/g, '\u00a0') },
+    },
     series: [
       {
         name: 'Receitas',
@@ -37,7 +71,7 @@ export function DashboardCharts({ monthly, byCategory, balanceSeries }: Props) {
     tooltip: {
       trigger: 'item',
       formatter: (p: { name: string; value: number; percent: number }) =>
-        `${p.name}: ${formatBRL(p.value)} (${p.percent}%)`,
+        `${p.name}: ${formatBRL(p.value)} (${p.percent.toFixed(1)}%)`,
     },
     series: [
       {
@@ -56,10 +90,23 @@ export function DashboardCharts({ monthly, byCategory, balanceSeries }: Props) {
   const line = {
     backgroundColor: 'transparent',
     textStyle: { color: '#8b9aab' },
-    tooltip: { trigger: 'axis' },
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: Array<{ axisValue: string; value: number }>) => {
+        const p = params[0]
+        return `${formatDate(p.axisValue)}<br/>Saldo: ${formatBRL(p.value)}`
+      },
+    },
     grid: { left: 48, right: 16, top: 24, bottom: 30 },
-    xAxis: { type: 'category', data: balanceSeries.map((b) => b.date) },
-    yAxis: { type: 'value' },
+    xAxis: {
+      type: 'category',
+      data: balanceSeries.map((b) => b.date),
+      axisLabel: { formatter: (v: string) => formatDate(v) },
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { formatter: (v: number) => formatBRL(v).replace(/\s/g, '\u00a0') },
+    },
     series: [
       {
         type: 'line',
@@ -74,19 +121,31 @@ export function DashboardCharts({ monthly, byCategory, balanceSeries }: Props) {
   }
 
   return (
-    <>
+    <div className="grid gap-6 lg:grid-cols-2">
       <div>
-        <h3 style={{ marginBottom: '0.5rem' }}>Receita × despesa</h3>
-        <ReactECharts option={bars} style={{ height: 280 }} />
+        <h3 className="mb-2 font-medium">Receita × despesa</h3>
+        {hasMonthly ? (
+          <ReactECharts option={bars} style={{ height: 280 }} />
+        ) : (
+          <EmptyChart title="Receita × despesa" message="Sem lançamentos nos últimos meses." />
+        )}
       </div>
       <div>
-        <h3 style={{ marginBottom: '0.5rem' }}>Gastos por categoria</h3>
-        <ReactECharts option={donut} style={{ height: 280 }} />
+        <h3 className="mb-2 font-medium">Gastos por categoria</h3>
+        {hasCategory ? (
+          <ReactECharts option={donut} style={{ height: 280 }} />
+        ) : (
+          <EmptyChart title="Gastos por categoria" message="Nenhuma despesa categorizada neste período." />
+        )}
       </div>
-      <div style={{ gridColumn: '1 / -1' }}>
-        <h3 style={{ marginBottom: '0.5rem' }}>Evolução do saldo</h3>
-        <ReactECharts option={line} style={{ height: 260 }} />
+      <div className="lg:col-span-2">
+        <h3 className="mb-2 font-medium">Evolução do saldo</h3>
+        {hasBalance ? (
+          <ReactECharts option={line} style={{ height: 260 }} />
+        ) : (
+          <EmptyChart title="Evolução do saldo" message="Cadastre transações para ver a evolução." />
+        )}
       </div>
-    </>
+    </div>
   )
 }

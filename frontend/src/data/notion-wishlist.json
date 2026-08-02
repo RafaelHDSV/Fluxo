@@ -1,0 +1,130 @@
+{
+  "items": [
+    {
+      "name": "Cadeira Gamer",
+      "price": 859.99,
+      "saved_amount": 859.99,
+      "category": "Móveis",
+      "url": "https://www.pichau.com.br/cadeira-gamer-pichau-omega-s-espuma-moldada-braco-3d-preta-e-cinza-pg-omgs-bg01",
+      "purchased": true,
+      "source_ref": "https://app.notion.com/p/8070555a010649429252339601ae1986"
+    },
+    {
+      "name": "Carteira de Motorista",
+      "price": 2430.52,
+      "saved_amount": 2430.52,
+      "category": "Automóvel",
+      "url": null,
+      "purchased": true,
+      "source_ref": "https://app.notion.com/p/3382562033034b6da8e344ff07e8b046"
+    },
+    {
+      "name": "Foto 10x15 Imã - Kit com 5 fotos",
+      "price": 20,
+      "saved_amount": 0,
+      "category": "Casa",
+      "url": "https://www.imprimafotos.com.br/produtos/foto-10x15-ima-kit-com-5-fotos/",
+      "purchased": false,
+      "source_ref": "https://app.notion.com/p/2dea29a59b0980fea6c7fcdc9e9403e6"
+    },
+    {
+      "name": "Kindle 11ª Geração",
+      "price": 499,
+      "saved_amount": 0,
+      "category": "Eletrônico",
+      "url": "https://www.amazon.com.br/dp/B09SWTG9GF",
+      "purchased": false,
+      "source_ref": "https://app.notion.com/p/c169db8a227d4984badcb5ec741f5353"
+    },
+    {
+      "name": "Moto",
+      "price": 19900,
+      "saved_amount": 19900,
+      "category": "Automóvel",
+      "url": "https://sp.olx.com.br/regiao-de-sorocaba/autos-e-pecas/motos/honda-cb-twister-250-com-29-mil-km-1394955740",
+      "purchased": true,
+      "source_ref": "https://app.notion.com/p/7664622d2ebe4447bf8e57b3d657fe7c"
+    },
+    {
+      "name": "Notebook",
+      "price": 2839,
+      "saved_amount": 2839,
+      "category": "Eletrônico",
+      "url": "https://www.amazon.com.br/Notebook-Dell-Inspiron-I15-I120K-A25P-Gera%C3%A7%C3%A3o/dp/B0DCKWYRQ6",
+      "purchased": true,
+      "source_ref": "https://app.notion.com/p/15aa29a59b0980f4bf90db1aa2f516a0"
+    },
+    {
+      "name": "Par Intercomunicador Ejeas V6 Pro+ Controle Guidão Fone Moto",
+      "price": 1079.56,
+      "saved_amount": 0,
+      "category": "Automóvel",
+      "url": "https://www.mercadolivre.com.br/par-intercomunicador-ejeas-v6-pro-controle-guido-fone-moto/p/MLB42170523",
+      "purchased": false,
+      "source_ref": "https://app.notion.com/p/244a29a59b098037b5cfe1f0f31e5a58"
+    },
+    {
+      "name": "Parafusadeira Furadeira C/ 2 Baterias + Maleta Kit Completo",
+      "price": 179.4,
+      "saved_amount": 0,
+      "category": "Casa",
+      "url": "https://www.mercadolivre.com.br/parafusadeira-furadeira-c-2-baterias-maleta-kit-completo-led-eixo-flexivel-varios-niveis-torque/p/MLB50181290",
+      "purchased": false,
+      "source_ref": "https://app.notion.com/p/260a29a59b098064a2b1e76c32f694fb"
+    },
+    {
+      "name": "Pinlock",
+      "price": 97.83,
+      "saved_amount": 0,
+      "category": "Automóvel",
+      "url": "https://produto.mercadolivre.com.br/MLB-813036620-viseira-pelicula-anti-embacante-sky-pinlock-universal-chuva-_JM",
+      "purchased": false,
+      "source_ref": "https://app.notion.com/p/1f7a29a59b0980e1a9d1eb118413ac78"
+    },
+    {
+      "name": "Suporte de Capacete",
+      "price": 11.65,
+      "saved_amount": 0,
+      "category": "Automóvel",
+      "url": "https://produto.mercadolivre.com.br/MLB-3022623430-suporte-de-capacete-para-pendurar-gancho-chave-moto-preto-_JM",
+      "purchased": false,
+      "source_ref": "https://app.notion.com/p/1f7a29a59b0980b59c89cda23a648b11"
+    },
+    {
+      "name": "Suporte de Fone de Ouvido",
+      "price": 19.17,
+      "saved_amount": 0,
+      "category": "Eletrônico",
+      "url": "https://produto.mercadolivre.com.br/MLB-1340751275-suporte-de-parede-fone-headset-headphone-com-fita-dupla-face-_JM",
+      "purchased": false,
+      "source_ref": "https://app.notion.com/p/244a29a59b09805da198de10a9d5592a"
+    },
+    {
+      "name": "Suporte Notebook",
+      "price": 34.87,
+      "saved_amount": 0,
+      "category": "Eletrônico",
+      "url": "https://www.mercadolivre.com.br/suporte-note-apoio-notebook-laptop-computador-mesa-universal-rishon-cor-preto/p/MLB44354994",
+      "purchased": false,
+      "source_ref": "https://app.notion.com/p/244a29a59b09802e8600cd2fbf51c7fb"
+    },
+    {
+      "name": "Tomada",
+      "price": 40,
+      "saved_amount": 40,
+      "category": "Casa",
+      "url": null,
+      "purchased": true,
+      "source_ref": "https://app.notion.com/p/248a29a59b0980bd8aa7e7e5d785dd7a"
+    },
+    {
+      "name": "Trava de Manopla",
+      "price": 197,
+      "saved_amount": 0,
+      "category": "Automóvel",
+      "url": "https://www.tecklock.com.br/kit-trava-manopola-tava-de-capacete/preto",
+      "purchased": false,
+      "source_ref": "https://app.notion.com/p/244a29a59b0980ab837af01f6636bbaa"
+    }
+  ]
+}

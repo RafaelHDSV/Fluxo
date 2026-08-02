@@ -1,7 +1,28 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { formatBRL } from '../lib/format'
-import { api } from '../services/api'
-import styles from './Page.module.scss'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { formatBRL } from '@/lib/format'
+import { accountTypeLabel, categoryKindLabel, labelOf, matchTypeLabel } from '@/lib/labels'
+import { api } from '@/services/api'
 
 type Account = {
   id: string
@@ -15,47 +36,74 @@ type Account = {
 type Category = { id: string; name: string; kind: string }
 type Rule = { id: string; category_id: string; match_type: string; pattern: string }
 
+const emptyAccountForm = {
+  name: '',
+  type: 'checking',
+  balance: '0',
+  due_day: '',
+  credit_limit: '',
+}
+
 export function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [rules, setRules] = useState<Rule[]>([])
-  const [form, setForm] = useState({
-    name: '',
-    type: 'checking',
-    balance: '0',
-    due_day: '',
-    credit_limit: '',
-  })
+  const [form, setForm] = useState(emptyAccountForm)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [catName, setCatName] = useState('')
   const [rule, setRule] = useState({ category_id: '', match_type: 'contains', pattern: '' })
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   async function load() {
-    const [accs, cats, rls] = await Promise.all([
-      api.get<Account[]>('/api/accounts'),
-      api.get<Category[]>('/api/categories'),
-      api.get<Rule[]>('/api/categories/rules'),
-    ])
-    setAccounts(accs)
-    setCategories(cats)
-    setRules(rls)
-    if (!rule.category_id && cats[0]) setRule((r) => ({ ...r, category_id: cats[0].id }))
+    setLoading(true)
+    setError('')
+    try {
+      const [accs, cats, rls] = await Promise.all([
+        api.get<Account[]>('/api/accounts'),
+        api.get<Category[]>('/api/categories'),
+        api.get<Rule[]>('/api/categories/rules'),
+      ])
+      setAccounts(accs)
+      setCategories(cats)
+      setRules(rls)
+      setRule((r) => ({ ...r, category_id: r.category_id || cats[0]?.id || '' }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    load().catch((e) => setError(e instanceof Error ? e.message : 'Erro'))
+    load()
   }, [])
 
-  async function createAccount(e: FormEvent) {
+  async function saveAccount(e: FormEvent) {
     e.preventDefault()
-    await api.post('/api/accounts', {
-      ...form,
+    const payload = {
+      name: form.name,
+      type: form.type,
       balance: Number(form.balance),
       due_day: form.due_day ? Number(form.due_day) : null,
       credit_limit: form.credit_limit ? Number(form.credit_limit) : null,
-    })
-    setForm({ name: '', type: 'checking', balance: '0', due_day: '', credit_limit: '' })
+    }
+    if (editingId) await api.put(`/api/accounts/${editingId}`, payload)
+    else await api.post('/api/accounts', payload)
+    setForm(emptyAccountForm)
+    setEditingId(null)
     await load()
+  }
+
+  function startEditAccount(a: Account) {
+    setEditingId(a.id)
+    setForm({
+      name: a.name,
+      type: a.type,
+      balance: String(a.balance),
+      due_day: a.due_day != null ? String(a.due_day) : '',
+      credit_limit: a.credit_limit != null ? String(a.credit_limit) : '',
+    })
   }
 
   async function createCategory(e: FormEvent) {
@@ -73,155 +121,231 @@ export function AccountsPage() {
   }
 
   return (
-    <div>
-      <header className={styles.header}>
-        <div>
-          <h1>Contas e categorias</h1>
-          <p>Origens do dinheiro, cartões e regras de categorização.</p>
-        </div>
+    <div className="space-y-6">
+      <header>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">Contas e categorias</h1>
+        <p className="text-muted-foreground">Origens do dinheiro, cartões e regras de categorização.</p>
       </header>
-      {error && <p className={styles.error}>{error}</p>}
 
-      <section className={styles.panel}>
-        <h3>Nova conta / cartão</h3>
-        <form onSubmit={createAccount} className={styles.formRow}>
-          <label>
-            Nome
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          </label>
-          <label>
-            Tipo
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-              <option value="checking">Conta corrente</option>
-              <option value="wallet">Carteira</option>
-              <option value="investment">Investimento</option>
-              <option value="credit_card">Cartão de crédito</option>
-              <option value="external">Externa</option>
-            </select>
-          </label>
-          <label>
-            Saldo
-            <input
-              type="number"
-              step="0.01"
-              value={form.balance}
-              onChange={(e) => setForm({ ...form, balance: e.target.value })}
-            />
-          </label>
-          <label>
-            Vencimento (cartão)
-            <input
-              type="number"
-              min={1}
-              max={31}
-              value={form.due_day}
-              onChange={(e) => setForm({ ...form, due_day: e.target.value })}
-            />
-          </label>
-          <label>
-            Limite
-            <input
-              type="number"
-              step="0.01"
-              value={form.credit_limit}
-              onChange={(e) => setForm({ ...form, credit_limit: e.target.value })}
-            />
-          </label>
-          <div style={{ alignSelf: 'end' }}>
-            <button className="primary" type="submit">
-              Salvar conta
-            </button>
-          </div>
-        </form>
-        <table>
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Tipo</th>
-              <th>Saldo</th>
-              <th>Venc.</th>
-            </tr>
-          </thead>
-          <tbody>
-            {accounts.map((a) => (
-              <tr key={a.id}>
-                <td>{a.name}</td>
-                <td>{a.type}</td>
-                <td className="money">{formatBRL(a.balance)}</td>
-                <td>{a.due_day ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <section className={styles.panel}>
-        <h3>Categorias</h3>
-        <form onSubmit={createCategory} className={styles.formRow}>
-          <label>
-            Nome
-            <input value={catName} onChange={(e) => setCatName(e.target.value)} required />
-          </label>
-          <div style={{ alignSelf: 'end' }}>
-            <button className="primary" type="submit">
-              Adicionar
-            </button>
-          </div>
-        </form>
-        <p>{categories.map((c) => c.name).join(' · ')}</p>
-      </section>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">{editingId ? 'Editar conta' : 'Nova conta / cartão'}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={saveAccount} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="acc-name">Nome</Label>
+              <Input
+                id="acc-name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(accountTypeLabel).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="acc-balance">Saldo</Label>
+              <Input
+                id="acc-balance"
+                type="number"
+                step="0.01"
+                value={form.balance}
+                onChange={(e) => setForm({ ...form, balance: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="acc-due">Vencimento (cartão)</Label>
+              <Input
+                id="acc-due"
+                type="number"
+                min={1}
+                max={31}
+                value={form.due_day}
+                onChange={(e) => setForm({ ...form, due_day: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="acc-limit">Limite</Label>
+              <Input
+                id="acc-limit"
+                type="number"
+                step="0.01"
+                value={form.credit_limit}
+                onChange={(e) => setForm({ ...form, credit_limit: e.target.value })}
+              />
+            </div>
+            <div className="flex items-end gap-2">
+              <Button type="submit">{editingId ? 'Atualizar' : 'Salvar conta'}</Button>
+              {editingId && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setEditingId(null)
+                    setForm(emptyAccountForm)
+                  }}
+                >
+                  Cancelar
+                </Button>
+              )}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
-      <section className={styles.panel}>
-        <h3>Regras de categorização</h3>
-        <form onSubmit={createRule} className={styles.formRow}>
-          <label>
-            Categoria
-            <select
-              value={rule.category_id}
-              onChange={(e) => setRule({ ...rule, category_id: e.target.value })}
-            >
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Contas cadastradas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : accounts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma conta cadastrada.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead className="text-right">Saldo</TableHead>
+                    <TableHead>Venc.</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accounts.map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell>{a.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="muted">{labelOf(accountTypeLabel, a.type)}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono tabular-nums">{formatBRL(a.balance)}</TableCell>
+                      <TableCell>{a.due_day ?? '—'}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" type="button" onClick={() => startEditAccount(a)}>
+                          Editar
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Categorias</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form onSubmit={createCategory} className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[200px] flex-1 space-y-2">
+              <Label htmlFor="cat-name">Nome</Label>
+              <Input id="cat-name" value={catName} onChange={(e) => setCatName(e.target.value)} required />
+            </div>
+            <Button type="submit">Adicionar</Button>
+          </form>
+          {categories.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma categoria.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>
+                <Badge key={c.id} variant="outline">
                   {c.name}
-                </option>
+                  <span className="ml-1 text-muted-foreground">({labelOf(categoryKindLabel, c.kind)})</span>
+                </Badge>
               ))}
-            </select>
-          </label>
-          <label>
-            Tipo
-            <select
-              value={rule.match_type}
-              onChange={(e) => setRule({ ...rule, match_type: e.target.value })}
-            >
-              <option value="contains">Contém texto</option>
-              <option value="recurring">Recorrente</option>
-              <option value="source">Origem</option>
-            </select>
-          </label>
-          <label>
-            Padrão
-            <input
-              value={rule.pattern}
-              onChange={(e) => setRule({ ...rule, pattern: e.target.value })}
-              placeholder="Uber"
-              required
-            />
-          </label>
-          <div style={{ alignSelf: 'end' }}>
-            <button className="primary" type="submit">
-              Criar regra
-            </button>
-          </div>
-        </form>
-        <ul>
-          {rules.map((r) => (
-            <li key={r.id}>
-              [{r.match_type}] “{r.pattern}” →{' '}
-              {categories.find((c) => c.id === r.category_id)?.name || r.category_id}
-            </li>
-          ))}
-        </ul>
-      </section>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Regras de categorização</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form onSubmit={createRule} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select value={rule.category_id} onValueChange={(v) => setRule({ ...rule, category_id: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select value={rule.match_type} onValueChange={(v) => setRule({ ...rule, match_type: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(matchTypeLabel).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="rule-pattern">Padrão</Label>
+              <Input
+                id="rule-pattern"
+                value={rule.pattern}
+                onChange={(e) => setRule({ ...rule, pattern: e.target.value })}
+                placeholder="Uber"
+                required
+              />
+            </div>
+            <div className="flex items-end">
+              <Button type="submit">Criar regra</Button>
+            </div>
+          </form>
+          {rules.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma regra cadastrada.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {rules.map((r) => (
+                <li key={r.id} className="rounded-lg border border-border px-3 py-2">
+                  <Badge variant="muted" className="mr-2">
+                    {labelOf(matchTypeLabel, r.match_type)}
+                  </Badge>
+                  “{r.pattern}” → {categories.find((c) => c.id === r.category_id)?.name || r.category_id}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

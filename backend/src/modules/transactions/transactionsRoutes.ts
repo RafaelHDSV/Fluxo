@@ -60,11 +60,28 @@ router.get('/', async (req, res) => {
     where.push(`payment_method = $${params.length}`)
   }
 
-  const rows = await query(
-    `select * from ${T.transactions} where ${where.join(' and ')} order by date desc, created_at desc limit 500`,
+  const limitRaw = typeof req.query.limit === 'string' ? Number(req.query.limit) : 50
+  const offsetRaw = typeof req.query.offset === 'string' ? Number(req.query.offset) : 0
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(Math.trunc(limitRaw), 1), 200) : 50
+  const offset = Number.isFinite(offsetRaw) ? Math.max(Math.trunc(offsetRaw), 0) : 0
+
+  const countRow = await queryOne<{ count: string }>(
+    `select count(*)::text as count from ${T.transactions} where ${where.join(' and ')}`,
     params,
   )
-  res.json(rows)
+  const total = Number(countRow?.count ?? 0)
+
+  const limitIdx = params.length + 1
+  const offsetIdx = params.length + 2
+  const rows = await query(
+    `select * from ${T.transactions}
+     where ${where.join(' and ')}
+     order by date desc, created_at desc
+     limit $${limitIdx} offset $${offsetIdx}`,
+    [...params, limit, offset],
+  )
+
+  res.json({ items: rows, total, limit, offset })
 })
 
 router.post('/', async (req, res) => {

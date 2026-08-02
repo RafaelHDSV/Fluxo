@@ -18,6 +18,7 @@ function currentMonthBounds() {
 router.get('/dashboard', async (req, res) => {
   const { from, to } = currentMonthBounds()
   const userId = req.userId
+  const now = new Date()
 
   const balanceRow = await queryOne<{ sum: string }>(
     `select coalesce(sum(balance),0) as sum from ${T.accounts}
@@ -113,6 +114,33 @@ router.get('/dashboard', async (req, res) => {
     userId,
   ])
 
+  const prevFromDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const prevToDate = new Date(now.getFullYear(), now.getMonth(), 0)
+  const prevFrom = `${prevFromDate.getFullYear()}-${String(prevFromDate.getMonth() + 1).padStart(2, '0')}-01`
+  const prevTo = `${prevToDate.getFullYear()}-${String(prevToDate.getMonth() + 1).padStart(2, '0')}-${String(prevToDate.getDate()).padStart(2, '0')}`
+
+  const prevAgg = await queryOne<{ income: string; expense: string }>(
+    `select
+      coalesce(sum(case when type = 'income' then amount else 0 end),0) as income,
+      coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense
+     from ${T.transactions}
+     where user_id = $1 and date between $2 and $3`,
+    [userId, prevFrom, prevTo],
+  )
+  const previousIncome = toNumber(prevAgg?.income)
+  const previousExpense = toNumber(prevAgg?.expense)
+  const incomeDeltaPct =
+    previousIncome > 0 ? ((income - previousIncome) / previousIncome) * 100 : income > 0 ? 100 : null
+  const expenseDeltaPct =
+    previousExpense > 0 ? ((expense - previousExpense) / previousExpense) * 100 : expense > 0 ? 100 : null
+
+  const unpaidRow = await queryOne<{ count: string; total: string }>(
+    `select count(*)::text as count, coalesce(sum(amount),0) as total
+     from ${T.transactions}
+     where user_id = $1 and type = 'expense' and paid = false and date between $2 and $3`,
+    [userId, from, to],
+  )
+
   res.json({
     period: { from, to },
     balance: toNumber(balanceRow?.sum),
@@ -120,6 +148,12 @@ router.get('/dashboard', async (req, res) => {
     expense,
     result,
     savingsRate,
+    previousIncome,
+    previousExpense,
+    incomeDeltaPct,
+    expenseDeltaPct,
+    unpaidCount: Number(unpaidRow?.count ?? 0),
+    unpaidTotal: toNumber(unpaidRow?.total),
     byCategory,
     monthly,
     balanceSeries,
@@ -128,6 +162,68 @@ router.get('/dashboard', async (req, res) => {
     alerts,
     goals,
   })
+})
+
+router.get('/calendar', async (req, res) => {
+  const yearRaw = typeof req.query.year === 'string' ? Number(req.query.year) : new Date().getFullYear()
+  const year = Number.isFinite(yearRaw) ? Math.trunc(yearRaw) : new Date().getFullYear()
+  const from = `${year}-01-01`
+  const to = `${year}-12-31`
+  const now = new Date()
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+  const months = await query<{ month: string; income: string; expense: string }>(
+    `select to_char(date_trunc('month', date), 'YYYY-MM') as month,
+      coalesce(sum(case when type = 'income' then amount else 0 end),0) as income,
+      coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense
+     from ${T.transactions}
+     where user_id = $1 and date between $2 and $3
+     group by 1
+     order by 1`,
+    [req.userId, from, to],
+  )
+
+  const byMonth = new Map(months.map((m) => [m.month, m]))
+  const monthNames = [
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro',
+  ]
+
+  const filled = Array.from({ length: 12 }, (_, i) => {
+    const month = `${year}-${String(i + 1).padStart(2, '0')}`
+    const row = byMonth.get(month)
+    const income = toNumber(row?.income)
+    const expense = toNumber(row?.expense)
+    return {
+      month,
+      label: monthNames[i],
+      income,
+      expense,
+      result: income - expense,
+      isCurrent: month === currentMonth,
+    }
+  })
+
+  const totals = filled.reduce(
+    (acc, m) => ({
+      income: acc.income + m.income,
+      expense: acc.expense + m.expense,
+      result: acc.result + m.result,
+    }),
+    { income: 0, expense: 0, result: 0 },
+  )
+
+  res.json({ year, months: filled, totals })
 })
 
 router.get('/summary', async (req, res) => {

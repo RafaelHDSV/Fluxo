@@ -7,6 +7,7 @@ export const T = {
   transactions: 'fluxo_transactions',
   budgets: 'fluxo_budgets',
   goals: 'fluxo_goals',
+  wishlist: 'fluxo_wishlist',
   imports: 'fluxo_imports',
   importRows: 'fluxo_import_rows',
 } as const

@@ -1,4 +1,4 @@
-import styles from './SummaryCard.module.scss'
+import { cn } from '@/lib/utils'
 
 type Props = {
   label: string
@@ -8,9 +8,23 @@ type Props = {
 
 export function SummaryCard({ label, value, tone = 'default' }: Props) {
   return (
-    <article className={`${styles.card} ${styles[tone]}`}>
-      <p className={styles.label}>{label}</p>
-      <p className={`money ${styles.value}`}>{value}</p>
+    <article
+      className={cn(
+        'rounded-xl border border-border bg-surface p-4 shadow-sm',
+        tone === 'positive' && 'border-primary/30',
+        tone === 'negative' && 'border-destructive/30',
+      )}
+    >
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p
+        className={cn(
+          'mt-1 font-mono text-xl font-semibold tabular-nums',
+          tone === 'positive' && 'text-primary',
+          tone === 'negative' && 'text-destructive',
+        )}
+      >
+        {value}
+      </p>
     </article>
   )
 }

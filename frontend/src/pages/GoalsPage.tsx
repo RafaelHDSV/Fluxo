@@ -1,7 +1,12 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { formatBRL } from '../lib/format'
-import { api } from '../services/api'
-import styles from './Page.module.scss'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Progress } from '@/components/ui/progress'
+import { Skeleton } from '@/components/ui/skeleton'
+import { formatBRL, formatDate } from '@/lib/format'
+import { api } from '@/services/api'
 
 type Goal = {
   id: string
@@ -19,14 +24,23 @@ export function GoalsPage() {
     current_amount: '0',
     deadline: '',
   })
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   async function load() {
-    setGoals(await api.get<Goal[]>('/api/goals'))
+    setLoading(true)
+    setError('')
+    try {
+      setGoals(await api.get<Goal[]>('/api/goals'))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    load().catch((e) => setError(e instanceof Error ? e.message : 'Erro'))
+    load()
   }, [])
 
   async function onSubmit(e: FormEvent) {
@@ -47,94 +61,113 @@ export function GoalsPage() {
   }
 
   return (
-    <div>
-      <header className={styles.header}>
-        <div>
-          <h1>Metas</h1>
-          <p>Reserva, viagem, dívida — acompanhe o progresso.</p>
-        </div>
+    <div className="space-y-6">
+      <header>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">Metas</h1>
+        <p className="text-muted-foreground">Reserva, viagem, dívida — acompanhe o progresso.</p>
       </header>
-      {error && <p className={styles.error}>{error}</p>}
 
-      <section className={styles.panel}>
-        <form onSubmit={onSubmit} className={styles.formRow}>
-          <label>
-            Nome
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          </label>
-          <label>
-            Valor alvo
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.target_amount}
-              onChange={(e) => setForm({ ...form, target_amount: e.target.value })}
-              required
-            />
-          </label>
-          <label>
-            Valor atual
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.current_amount}
-              onChange={(e) => setForm({ ...form, current_amount: e.target.value })}
-            />
-          </label>
-          <label>
-            Prazo
-            <input
-              type="date"
-              value={form.deadline}
-              onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-            />
-          </label>
-          <div style={{ alignSelf: 'end' }}>
-            <button className="primary" type="submit">
-              Criar meta
-            </button>
-          </div>
-        </form>
-      </section>
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <section className={styles.panel}>
-        {goals.length === 0 ? (
-          <p className={styles.empty}>Nenhuma meta cadastrada.</p>
-        ) : (
-          goals.map((g) => {
-            const current = Number(g.current_amount)
-            const target = Number(g.target_amount)
-            const pct = target > 0 ? Math.min(100, (current / target) * 100) : 0
-            return (
-              <div key={g.id} style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                  <div>
-                    <strong>{g.name}</strong>
-                    {g.deadline && (
-                      <div style={{ color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
-                        até {String(g.deadline).slice(0, 10)}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Nova meta</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-2">
+              <Label htmlFor="goal-name">Nome</Label>
+              <Input
+                id="goal-name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="goal-target">Valor alvo</Label>
+              <Input
+                id="goal-target"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.target_amount}
+                onChange={(e) => setForm({ ...form, target_amount: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="goal-current">Valor atual</Label>
+              <Input
+                id="goal-current"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.current_amount}
+                onChange={(e) => setForm({ ...form, current_amount: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="goal-deadline">Prazo</Label>
+              <Input
+                id="goal-deadline"
+                type="date"
+                value={form.deadline}
+                onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button type="submit">Criar meta</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Suas metas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : goals.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma meta cadastrada.</p>
+          ) : (
+            <div className="space-y-4">
+              {goals.map((g) => {
+                const current = Number(g.current_amount)
+                const target = Number(g.target_amount)
+                const pct = target > 0 ? Math.min(100, (current / target) * 100) : 0
+                return (
+                  <div key={g.id} className="rounded-lg border border-border p-4">
+                    <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <strong>{g.name}</strong>
+                        {g.deadline && (
+                          <p className="text-xs text-muted-foreground">até {formatDate(g.deadline)}</p>
+                        )}
                       </div>
-                    )}
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm tabular-nums">
+                          {formatBRL(current)} / {formatBRL(target)}
+                        </span>
+                        <Button variant="destructive" size="sm" type="button" onClick={() => onDelete(g.id)}>
+                          Excluir
+                        </Button>
+                      </div>
+                    </div>
+                    <Progress value={pct} className="h-2" />
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <span className="money">
-                      {formatBRL(current)} / {formatBRL(target)}
-                    </span>
-                    <button className="danger" type="button" onClick={() => onDelete(g.id)}>
-                      Excluir
-                    </button>
-                  </div>
-                </div>
-                <div className={styles.progress}>
-                  <span style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-            )
-          })
-        )}
-      </section>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
