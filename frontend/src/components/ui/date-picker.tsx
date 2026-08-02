@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -34,7 +35,6 @@ function monthLabel(year: number, monthIndex: number) {
 
 function buildGrid(year: number, monthIndex: number) {
   const first = new Date(year, monthIndex, 1)
-  // Monday-first: getDay() Sun=0 → convert to Mon=0
   const startOffset = (first.getDay() + 6) % 7
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
   const cells: Array<{ day: number; iso: string; inMonth: boolean } | null> = []
@@ -48,14 +48,40 @@ function buildGrid(year: number, monthIndex: number) {
   return cells
 }
 
-/** Calendário custom pt-BR — valor ISO (YYYY-MM-DD), exibição DD/MM/YYYY. */
+/** Digits → DD/MM/YYYY mask while typing. */
+function maskBrDate(raw: string) {
+  const digits = raw.replace(/\D/g, '').slice(0, 8)
+  if (digits.length <= 2) return digits
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+}
+
+/** Parse DD/MM/YYYY (also accepts D/M/YYYY). Returns ISO or null. */
+function parseBrDate(text: string): string | null {
+  const m = text.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (!m) return null
+  const day = Number(m[1])
+  const month = Number(m[2])
+  const year = Number(m[3])
+  if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) return null
+  const date = new Date(year, month - 1, day)
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null
+  return toISO(date)
+}
+
+/** Calendário custom pt-BR — valor ISO (YYYY-MM-DD), digitação e picker em DD/MM/YYYY. */
 export function DatePicker({ id, value, onChange, required, className, disabled }: Props) {
   const rootRef = useRef<HTMLDivElement>(null)
   const selected = parseISO(value)
   const today = useMemo(() => toISO(new Date()), [])
   const [open, setOpen] = useState(false)
+  const [text, setText] = useState(() => (value ? formatDate(value) : ''))
   const [viewYear, setViewYear] = useState(() => selected?.getFullYear() ?? new Date().getFullYear())
   const [viewMonth, setViewMonth] = useState(() => selected?.getMonth() ?? new Date().getMonth())
+
+  useEffect(() => {
+    setText(value ? formatDate(value) : '')
+  }, [value])
 
   useEffect(() => {
     if (!open) return
@@ -89,21 +115,82 @@ export function DatePicker({ id, value, onChange, required, className, disabled 
     setViewMonth(d.getMonth())
   }
 
+  function commitText(next: string) {
+    const iso = parseBrDate(next)
+    if (iso) {
+      onChange(iso)
+      setText(formatDate(iso))
+      return true
+    }
+    return false
+  }
+
+  function onInputChange(raw: string) {
+    const masked = maskBrDate(raw)
+    setText(masked)
+    if (masked.length === 10) commitText(masked)
+  }
+
+  function onInputBlur() {
+    if (!text.trim()) {
+      if (!required) onChange('')
+      else setText(value ? formatDate(value) : '')
+      return
+    }
+    if (!commitText(text)) {
+      setText(value ? formatDate(value) : '')
+    }
+  }
+
   return (
     <div ref={rootRef} className={cn('relative', className)}>
-      <Button
-        id={id}
-        type="button"
-        variant="outline"
-        disabled={disabled}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        className="w-full justify-start font-normal"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-        {value ? formatDate(value) : 'Selecionar data'}
-      </Button>
+      <div className="relative">
+        <Input
+          id={id}
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="DD/MM/AAAA"
+          disabled={disabled}
+          required={required}
+          value={text}
+          onChange={(e) => onInputChange(e.target.value)}
+          onFocus={() => {
+            if (!disabled) setOpen(true)
+          }}
+          onClick={() => {
+            if (!disabled) setOpen(true)
+          }}
+          onBlur={onInputBlur}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              onInputBlur()
+              ;(e.target as HTMLInputElement).blur()
+            }
+            if (e.key === 'ArrowDown' && !open) {
+              e.preventDefault()
+              setOpen(true)
+            }
+          }}
+          className="pr-10"
+          aria-expanded={open}
+          aria-haspopup="dialog"
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          disabled={disabled}
+          tabIndex={-1}
+          aria-label="Abrir calendário"
+          className="absolute right-0.5 top-1/2 h-9 w-9 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <CalendarIcon className="h-4 w-4" />
+        </Button>
+      </div>
 
       {open && (
         <div
@@ -145,6 +232,7 @@ export function DatePicker({ id, value, onChange, required, className, disabled 
                   )}
                   onClick={() => {
                     onChange(cell.iso)
+                    setText(formatDate(cell.iso))
                     setOpen(false)
                   }}
                 >
@@ -162,6 +250,7 @@ export function DatePicker({ id, value, onChange, required, className, disabled 
               className="flex-1"
               onClick={() => {
                 onChange(today)
+                setText(formatDate(today))
                 setOpen(false)
               }}
             >
@@ -173,8 +262,6 @@ export function DatePicker({ id, value, onChange, required, className, disabled 
           </div>
         </div>
       )}
-
-      <input type="hidden" value={value} required={required} readOnly aria-hidden />
     </div>
   )
 }
