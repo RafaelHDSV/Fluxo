@@ -23,8 +23,11 @@ import { cn } from '@/lib/utils'
 
 type Dashboard = {
   balance: number
+  openingBalance?: number
+  closingBalance?: number
   income: number
   expense: number
+  adjustments?: number
   result: number
   savingsRate: number
   previousIncome?: number
@@ -182,9 +185,14 @@ export function DashboardPage() {
       ) : data ? (
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <div className="space-y-1">
-              <SummaryCard label="Saldo atual" value={formatBRL(data.balance)} />
-            </div>
+            {periodMode !== 'all' && (
+              <div className="space-y-1">
+                <SummaryCard label="Saldo inicial" value={formatBRL(data.openingBalance ?? 0)} />
+                <p className="text-xs text-muted-foreground">
+                  Saldo que sobrou do período anterior.
+                </p>
+              </div>
+            )}
             <div className="space-y-1">
               <SummaryCard label="Receitas" value={formatBRL(data.income)} tone="positive" />
               {periodMode === 'month' && <DeltaHint value={data.incomeDeltaPct} />}
@@ -195,10 +203,22 @@ export function DashboardPage() {
             </div>
             <div className="space-y-1">
               <SummaryCard
-                label="Resultado"
+                label="Resultado do período"
                 value={formatBRL(data.result)}
                 tone={data.result >= 0 ? 'positive' : 'negative'}
               />
+            </div>
+            {periodMode !== 'all' && (
+              <div className="space-y-1">
+                <SummaryCard
+                  label="Saldo final"
+                  value={formatBRL(data.closingBalance ?? data.balance)}
+                  tone={(data.closingBalance ?? 0) >= 0 ? 'positive' : 'negative'}
+                />
+              </div>
+            )}
+            <div className="space-y-1">
+              <SummaryCard label="Saldo nas contas" value={formatBRL(data.balance)} />
             </div>
             <div className="space-y-1">
               <SummaryCard label="Taxa de economia" value={`${data.savingsRate.toFixed(1)}%`} />

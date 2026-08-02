@@ -43,6 +43,7 @@ Fluxo é um controle financeiro pessoal web: entradas, saídas, contas, categori
 7. Orçamentos = categorias + metas de gasto + regras de categorização (auto-sugestão na importação)
 8. Investimentos = ex-Metas (`fluxo_goals`) — caixinhas com progresso
 9. Notion foi carga inicial histórica; **não é fonte operacional**
+10. **Carryover mensal automático:** saldo inicial do período = resultado acumulado anterior (sem lançar “Reajuste de conta”)
 
 ---
 

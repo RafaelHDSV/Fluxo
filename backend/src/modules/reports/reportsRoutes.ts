@@ -47,10 +47,27 @@ router.get('/dashboard', async (req, res) => {
     [userId],
   )
 
-  const monthAgg = await queryOne<{ income: string; expense: string }>(
+  // Saldo inicial do período = resultado acumulado de tudo antes do período (carryover automático)
+  const openingRow =
+    bounds.period === 'all'
+      ? { sum: '0' }
+      : await queryOne<{ sum: string }>(
+          `select coalesce(sum(case
+             when type = 'income' then amount
+             when type = 'adjustment' then amount
+             when type = 'expense' and paid = true then -amount
+             else 0 end), 0) as sum
+           from ${T.transactions}
+           where user_id = $1 and date < $2::date`,
+          [userId, from],
+        )
+  const openingBalance = toNumber(openingRow?.sum)
+
+  const monthAgg = await queryOne<{ income: string; expense: string; adjustments: string }>(
     `select
       coalesce(sum(case when type = 'income' then amount else 0 end),0) as income,
-      coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense
+      coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense,
+      coalesce(sum(case when type = 'adjustment' then amount else 0 end),0) as adjustments
      from ${T.transactions}
      where user_id = $1 and date between $2 and $3`,
     [userId, from, to],
@@ -58,7 +75,9 @@ router.get('/dashboard', async (req, res) => {
 
   const income = toNumber(monthAgg?.income)
   const expense = toNumber(monthAgg?.expense)
+  const adjustments = toNumber(monthAgg?.adjustments)
   const result = income - expense
+  const closingBalance = openingBalance + result + adjustments
   const savingsRate = income > 0 ? (result / income) * 100 : 0
 
   const byCategory = await query(
@@ -83,9 +102,9 @@ router.get('/dashboard', async (req, res) => {
     [userId, from, to],
   )
 
-  const periodCashflow = await query(
+  const periodCashflowRaw = await query<{ date: string; result: string }>(
     `select d::text as date,
-      sum(daily) over (order by d) as result
+      ($4::numeric + sum(daily) over (order by d)) as result
      from (
        select date::date as d,
          coalesce(sum(case
@@ -98,8 +117,15 @@ router.get('/dashboard', async (req, res) => {
        group by date::date
      ) s
      order by d`,
-    [userId, from, to],
+    [userId, from, to, openingBalance],
   )
+  // Garante ponto inicial no gráfico mesmo sem lançamentos no período
+  const periodCashflow =
+    bounds.period === 'all'
+      ? periodCashflowRaw
+      : periodCashflowRaw.length === 0 || periodCashflowRaw[0]?.date !== from
+        ? [{ date: from, result: String(openingBalance) }, ...periodCashflowRaw]
+        : periodCashflowRaw
 
   const upcomingCards = await query(
     `select id, name, due_day, credit_limit, balance
@@ -173,8 +199,11 @@ router.get('/dashboard', async (req, res) => {
   res.json({
     period: { from: bounds.from, to: bounds.to, mode: bounds.period },
     balance: toNumber(balanceRow?.sum),
+    openingBalance,
+    closingBalance,
     income,
     expense,
+    adjustments,
     result,
     savingsRate,
     previousIncome,

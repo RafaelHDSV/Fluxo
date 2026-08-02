@@ -1,4 +1,4 @@
-import { Fragment, FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
@@ -90,6 +90,7 @@ export function TransactionsPage() {
   const [error, setError] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const formCardRef = useRef<HTMLDivElement>(null)
 
   const isIncomeOnly = type === 'income'
   const isExpenseForm = form.type === 'expense'
@@ -227,6 +228,9 @@ export function TransactionsPage() {
       paid: Boolean(tx.paid),
       payment_method: tx.payment_method || 'debit',
     })
+    requestAnimationFrame(() => {
+      formCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
 
   const groupedRows = useMemo(() => {
@@ -255,7 +259,7 @@ export function TransactionsPage() {
         <p className="text-muted-foreground">Crie, edite, filtre e categorize seus lançamentos.</p>
       </header>
 
-      <Card>
+      <Card ref={formCardRef}>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">{editingId ? 'Editar lançamento' : 'Novo lançamento'}</CardTitle>
         </CardHeader>
