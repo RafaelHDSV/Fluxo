@@ -83,9 +83,6 @@ function monthKey(date: string) {
   return String(date).slice(0, 7)
 }
 
-function txEffectiveDate(tx: Tx) {
-  return String(tx.effective_date || tx.due_date || tx.date).slice(0, 10)
-}
 
 function parsePeriodMode(raw: string | null): PeriodMode {
   if (raw === 'month' || raw === 'year' || raw === 'all') return raw
@@ -409,7 +406,7 @@ export function TransactionsPage() {
     const groups: Array<{ key: string; label: string; items: Tx[] }> = []
     let currentKey = ''
     for (const tx of items) {
-      const key = monthKey(txEffectiveDate(tx))
+      const key = monthKey(String(tx.date))
       if (key !== currentKey) {
         currentKey = key
         groups.push({ key, label: formatMonth(key, 'long'), items: [tx] })

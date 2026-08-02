@@ -110,6 +110,7 @@ router.get('/', async (req, res) => {
   const offsetRaw = typeof req.query.offset === 'string' ? Number(req.query.offset) : 0
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(Math.trunc(limitRaw), 1), 200) : 50
   const offset = Number.isFinite(offsetRaw) ? Math.max(Math.trunc(offsetRaw), 0) : 0
+  const sortBy = req.query.sort === 'effective' ? EFF : 'date'
 
   const countRow = await queryOne<{ count: string }>(
     `select count(*)::text as count from ${T.transactions} where ${where.join(' and ')}`,
@@ -123,7 +124,7 @@ router.get('/', async (req, res) => {
     `select *, (${EFF})::text as effective_date
      from ${T.transactions}
      where ${where.join(' and ')}
-     order by ${EFF} desc, created_at desc
+     order by ${sortBy} desc, date desc, created_at desc
      limit $${limitIdx} offset $${offsetIdx}`,
     [...params, limit, offset],
   )

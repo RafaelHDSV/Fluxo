@@ -78,6 +78,7 @@ export function PayablesPage() {
       const params = new URLSearchParams({
         type: 'expense',
         paid: 'false',
+        sort: 'effective',
         limit: '500',
         offset: '0',
       })
