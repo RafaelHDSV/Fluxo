@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { query, queryOne } from '../../lib/db.js'
 import { buildDedupeHash, toNumber } from '../../lib/money.js'
+import { T } from '../../lib/tables.js'
 import { requireAuth } from '../../middleware/auth.js'
 import { suggestCategoryId } from '../categories/suggestCategory.js'
 
@@ -38,7 +39,7 @@ router.get('/', async (req, res) => {
   }
 
   const rows = await query(
-    `select * from transactions where ${where.join(' and ')} order by date desc, created_at desc limit 500`,
+    `select * from ${T.transactions} where ${where.join(' and ')} order by date desc, created_at desc limit 500`,
     params,
   )
   res.json(rows)
@@ -83,7 +84,7 @@ router.post('/', async (req, res) => {
 
   try {
     const row = await queryOne(
-      `insert into transactions
+      `insert into ${T.transactions}
         (user_id, date, description, amount, type, category_id, account_id, transfer_account_id,
          card_account_id, tags, notes, dedupe_hash, external_fitid)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
@@ -123,7 +124,7 @@ router.put('/:id', async (req, res) => {
     amount: string
     account_id: string
     external_fitid: string | null
-  }>(`select * from transactions where id = $1 and user_id = $2`, [req.params.id, req.userId])
+  }>(`select * from ${T.transactions} where id = $1 and user_id = $2`, [req.params.id, req.userId])
 
   if (!existing) return res.status(404).json({ error: 'Transação não encontrada' })
 
@@ -143,7 +144,7 @@ router.put('/:id', async (req, res) => {
   })
 
   const row = await queryOne(
-    `update transactions set
+    `update ${T.transactions} set
       date = $3,
       description = $4,
       amount = $5,
@@ -180,7 +181,7 @@ router.put('/:id', async (req, res) => {
 })
 
 router.delete('/:id', async (req, res) => {
-  const row = await queryOne(`delete from transactions where id = $1 and user_id = $2 returning id`, [
+  const row = await queryOne(`delete from ${T.transactions} where id = $1 and user_id = $2 returning id`, [
     req.params.id,
     req.userId,
   ])

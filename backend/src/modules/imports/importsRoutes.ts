@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { query, queryOne } from '../../lib/db.js'
+import { T } from '../../lib/tables.js'
 import { buildDedupeHash, toNumber } from '../../lib/money.js'
 import { requireAuth } from '../../middleware/auth.js'
 import { suggestCategoryId } from '../categories/suggestCategory.js'
@@ -23,13 +24,13 @@ router.post('/preview', upload.single('file'), async (req, res) => {
   const parsed = isOfx ? parseOfx(content) : parseCsv(content, mapping)
 
   const imp = await queryOne<{ id: string }>(
-    `insert into imports (user_id, filename, source_type, status, account_id)
+    `insert into ${T.imports} (user_id, filename, source_type, status, account_id)
      values ($1,$2,$3,'preview',$4) returning id`,
     [req.userId, file.originalname, sourceType, accountId],
   )
 
   const existing = await query<{ dedupe_hash: string }>(
-    `select dedupe_hash from transactions where user_id = $1`,
+    `select dedupe_hash from ${T.transactions} where user_id = $1`,
     [req.userId],
   )
   const existingSet = new Set(existing.map((e) => e.dedupe_hash))
@@ -47,7 +48,7 @@ router.post('/preview', upload.single('file'), async (req, res) => {
     const suggested_category_id = await suggestCategoryId(req.userId!, p.description)
     const is_duplicate = existingSet.has(dedupe_hash)
     const inserted = await queryOne(
-      `insert into import_rows
+      `insert into ${T.importRows}
         (import_id, user_id, raw, date, description, amount, type, external_fitid, dedupe_hash,
          suggested_category_id, is_duplicate, selected)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
@@ -74,13 +75,13 @@ router.post('/preview', upload.single('file'), async (req, res) => {
 })
 
 router.get('/:id', async (req, res) => {
-  const imp = await queryOne(`select * from imports where id = $1 and user_id = $2`, [
+  const imp = await queryOne(`select * from ${T.imports} where id = $1 and user_id = $2`, [
     req.params.id,
     req.userId,
   ])
   if (!imp) return res.status(404).json({ error: 'Importação não encontrada' })
   const rows = await query(
-    `select * from import_rows where import_id = $1 and user_id = $2 order by date`,
+    `select * from ${T.importRows} where import_id = $1 and user_id = $2 order by date`,
     [req.params.id, req.userId],
   )
   res.json({ import: imp, rows })
@@ -88,7 +89,7 @@ router.get('/:id', async (req, res) => {
 
 router.post('/:id/commit', async (req, res) => {
   const imp = await queryOne<{ id: string; account_id: string; status: string }>(
-    `select * from imports where id = $1 and user_id = $2`,
+    `select * from ${T.imports} where id = $1 and user_id = $2`,
     [req.params.id, req.userId],
   )
   if (!imp) return res.status(404).json({ error: 'Importação não encontrada' })
@@ -98,10 +99,10 @@ router.post('/:id/commit', async (req, res) => {
 
   const selectedIds: string[] | undefined = req.body?.row_ids
   const params: unknown[] = [req.params.id, req.userId]
-  let sql = `select * from import_rows where import_id = $1 and user_id = $2 and selected = true and is_duplicate = false`
+  let sql = `select * from ${T.importRows} where import_id = $1 and user_id = $2 and selected = true and is_duplicate = false`
   if (selectedIds?.length) {
     params.push(selectedIds)
-    sql = `select * from import_rows where import_id = $1 and user_id = $2 and id = any($3::uuid[]) and is_duplicate = false`
+    sql = `select * from ${T.importRows} where import_id = $1 and user_id = $2 and id = any($3::uuid[]) and is_duplicate = false`
   }
 
   const rows = await query<{
@@ -120,7 +121,7 @@ router.post('/:id/commit', async (req, res) => {
     if (!row.suggested_category_id) continue
     try {
       await queryOne(
-        `insert into transactions
+        `insert into ${T.transactions}
           (user_id, date, description, amount, type, category_id, account_id, tags, dedupe_hash, external_fitid, import_id)
          values ($1,$2,$3,$4,$5,$6,$7,'{}',$8,$9,$10)
          on conflict (user_id, dedupe_hash) do nothing
@@ -144,7 +145,7 @@ router.post('/:id/commit', async (req, res) => {
     }
   }
 
-  await queryOne(`update imports set status = 'committed' where id = $1`, [imp.id])
+  await queryOne(`update ${T.imports} set status = 'committed' where id = $1`, [imp.id])
   res.json({ created, skipped: rows.length - created })
 })
 

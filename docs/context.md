@@ -18,7 +18,7 @@ Fluxo é um controle financeiro pessoal web: entradas, saídas, contas, categori
 |--------|-------------------|
 | Front | React 18, Vite, TypeScript, SASS, React Router, ECharts |
 | Back | Node, Express 5 (BFF) |
-| Banco / Auth | PostgreSQL via Supabase + Supabase Auth + RLS |
+| Banco / Auth | PostgreSQL via Supabase (tabelas `fluxo_*`) + Auth + RLS |
 | Tooling | Yarn, Node 22+ |
 
 ---

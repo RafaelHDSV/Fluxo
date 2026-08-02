@@ -1,12 +1,13 @@
 import { Router } from 'express'
 import { query, queryOne } from '../../lib/db.js'
+import { T } from '../../lib/tables.js'
 import { requireAuth } from '../../middleware/auth.js'
 
 const router = Router()
 router.use(requireAuth)
 
 router.get('/', async (req, res) => {
-  const rows = await query(`select * from goals where user_id = $1 order by created_at desc`, [req.userId])
+  const rows = await query(`select * from ${T.goals} where user_id = $1 order by created_at desc`, [req.userId])
   res.json(rows)
 })
 
@@ -16,7 +17,7 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'name e target_amount são obrigatórios' })
   }
   const row = await queryOne(
-    `insert into goals (user_id, name, target_amount, current_amount, deadline, account_id)
+    `insert into ${T.goals} (user_id, name, target_amount, current_amount, deadline, account_id)
      values ($1,$2,$3,$4,$5,$6) returning *`,
     [req.userId, name, target_amount, current_amount, deadline ?? null, account_id ?? null],
   )
@@ -26,7 +27,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const { name, target_amount, current_amount, deadline, account_id } = req.body ?? {}
   const row = await queryOne(
-    `update goals set
+    `update ${T.goals} set
       name = coalesce($3, name),
       target_amount = coalesce($4, target_amount),
       current_amount = coalesce($5, current_amount),
@@ -48,7 +49,7 @@ router.put('/:id', async (req, res) => {
 })
 
 router.delete('/:id', async (req, res) => {
-  const row = await queryOne(`delete from goals where id = $1 and user_id = $2 returning id`, [
+  const row = await queryOne(`delete from ${T.goals} where id = $1 and user_id = $2 returning id`, [
     req.params.id,
     req.userId,
   ])

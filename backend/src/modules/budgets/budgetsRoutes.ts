@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { query, queryOne } from '../../lib/db.js'
+import { T } from '../../lib/tables.js'
 import { requireAuth } from '../../middleware/auth.js'
 
 const router = Router()
@@ -16,14 +17,14 @@ router.get('/', async (req, res) => {
   const rows = await query(
     `select b.*, c.name as category_name,
       coalesce((
-        select sum(t.amount) from transactions t
+        select sum(t.amount) from ${T.transactions} t
         where t.user_id = b.user_id
           and t.category_id = b.category_id
           and t.type = 'expense'
           and date_trunc('month', t.date::timestamp) = date_trunc('month', b.month::timestamp)
       ), 0) as spent
-     from budgets b
-     join categories c on c.id = b.category_id
+     from ${T.budgets} b
+     join ${T.categories} c on c.id = b.category_id
      where b.user_id = $1 and b.month = $2::date
      order by c.name`,
     [req.userId, month],
@@ -38,7 +39,7 @@ router.post('/', async (req, res) => {
   }
   const m = monthStart(month)
   const row = await queryOne(
-    `insert into budgets (user_id, category_id, month, amount_limit)
+    `insert into ${T.budgets} (user_id, category_id, month, amount_limit)
      values ($1,$2,$3::date,$4)
      on conflict (user_id, category_id, month)
      do update set amount_limit = excluded.amount_limit
@@ -49,7 +50,7 @@ router.post('/', async (req, res) => {
 })
 
 router.delete('/:id', async (req, res) => {
-  const row = await queryOne(`delete from budgets where id = $1 and user_id = $2 returning id`, [
+  const row = await queryOne(`delete from ${T.budgets} where id = $1 and user_id = $2 returning id`, [
     req.params.id,
     req.userId,
   ])

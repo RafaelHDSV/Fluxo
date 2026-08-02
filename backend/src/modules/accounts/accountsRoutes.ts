@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { query, queryOne } from '../../lib/db.js'
+import { T } from '../../lib/tables.js'
 import { requireAuth } from '../../middleware/auth.js'
 
 const router = Router()
@@ -7,7 +8,7 @@ router.use(requireAuth)
 
 router.get('/', async (req, res) => {
   const rows = await query(
-    `select * from accounts where user_id = $1 and archived = false order by name`,
+    `select * from ${T.accounts} where user_id = $1 and archived = false order by name`,
     [req.userId],
   )
   res.json(rows)
@@ -20,7 +21,7 @@ router.post('/', async (req, res) => {
   }
 
   const row = await queryOne(
-    `insert into accounts (user_id, name, type, balance, credit_limit, due_day, closing_day, color)
+    `insert into ${T.accounts} (user_id, name, type, balance, credit_limit, due_day, closing_day, color)
      values ($1,$2,$3,$4,$5,$6,$7,$8)
      returning *`,
     [req.userId, name, type, balance, credit_limit ?? null, due_day ?? null, closing_day ?? null, color ?? null],
@@ -31,7 +32,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const { name, type, balance, credit_limit, due_day, closing_day, color, archived } = req.body ?? {}
   const row = await queryOne(
-    `update accounts set
+    `update ${T.accounts} set
       name = coalesce($3, name),
       type = coalesce($4, type),
       balance = coalesce($5, balance),
@@ -61,7 +62,7 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   const row = await queryOne(
-    `update accounts set archived = true where id = $1 and user_id = $2 returning id`,
+    `update ${T.accounts} set archived = true where id = $1 and user_id = $2 returning id`,
     [req.params.id, req.userId],
   )
   if (!row) return res.status(404).json({ error: 'Conta não encontrada' })
