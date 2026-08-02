@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "tsx src/modules/imports/parsers.test.ts",
+    "import:notion": "tsx scripts/import-notion.ts",
     "format": "prettier --write src/"
   },
   "dependencies": {

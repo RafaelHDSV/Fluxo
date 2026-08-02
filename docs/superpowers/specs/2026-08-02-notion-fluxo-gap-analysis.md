@@ -1,7 +1,7 @@
 # Diagnóstico Notion → Fluxo (gap analysis)
 
 **Data:** 2026-08-02  
-**Escopo:** só diagnóstico — sem importação, sem mudança de schema/UI nesta entrega.  
+**Escopo original:** só diagnóstico. **Follow-up:** importação P0–P2 em `2026-08-02-notion-import-design.md`.  
 **Fonte Notion:** hub [Financeiro](https://app.notion.com/p/14cb8c951bbd423893cff1b656351391)  
 **Alvo Fluxo:** tabelas `fluxo_*` + telas do MVP (`docs/superpowers/specs/2026-08-02-fluxo-mvp-design.md`, `backend/migrations/001_fluxo_schema.sql`)  
 **Consulta Notion:** readonly em 2026-08-02

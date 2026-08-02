@@ -8,8 +8,21 @@ import { suggestCategoryId } from '../categories/suggestCategory.js'
 const router = Router()
 router.use(requireAuth)
 
+function parsePaid(value: unknown): boolean | null {
+  if (value === true || value === 'true') return true
+  if (value === false || value === 'false') return false
+  return null
+}
+
+function parsePaymentMethod(value: unknown): 'debit' | 'credit' | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return null
+  if (value === 'debit' || value === 'credit') return value
+  return undefined
+}
+
 router.get('/', async (req, res) => {
-  const { q, type, account_id, category_id, from, to } = req.query
+  const { q, type, account_id, category_id, from, to, paid, payment_method } = req.query
   const params: unknown[] = [req.userId]
   const where = ['user_id = $1']
 
@@ -37,6 +50,15 @@ router.get('/', async (req, res) => {
     params.push(to)
     where.push(`date <= $${params.length}`)
   }
+  const paidFilter = parsePaid(paid)
+  if (paidFilter !== null) {
+    params.push(paidFilter)
+    where.push(`paid = $${params.length}`)
+  }
+  if (typeof payment_method === 'string' && (payment_method === 'debit' || payment_method === 'credit')) {
+    params.push(payment_method)
+    where.push(`payment_method = $${params.length}`)
+  }
 
   const rows = await query(
     `select * from ${T.transactions} where ${where.join(' and ')} order by date desc, created_at desc limit 500`,
@@ -59,10 +81,16 @@ router.post('/', async (req, res) => {
     tags = [],
     notes,
     external_fitid,
+    source_ref,
   } = body
 
   if (!date || !description || amount == null || !type || !account_id) {
     return res.status(400).json({ error: 'Campos obrigatórios ausentes' })
+  }
+
+  const paymentMethod = parsePaymentMethod(body.payment_method)
+  if (body.payment_method !== undefined && paymentMethod === undefined) {
+    return res.status(400).json({ error: 'payment_method inválido (debit|credit)' })
   }
 
   let categoryId = category_id as string | undefined
@@ -72,6 +100,8 @@ router.post('/', async (req, res) => {
   if (!categoryId) {
     return res.status(400).json({ error: 'category_id é obrigatório (sem categoria padrão)' })
   }
+
+  const paid = parsePaid(body.paid) ?? true
 
   const dedupe_hash = buildDedupeHash({
     userId: req.userId!,
@@ -86,8 +116,8 @@ router.post('/', async (req, res) => {
     const row = await queryOne(
       `insert into ${T.transactions}
         (user_id, date, description, amount, type, category_id, account_id, transfer_account_id,
-         card_account_id, tags, notes, dedupe_hash, external_fitid)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         card_account_id, tags, notes, dedupe_hash, external_fitid, paid, payment_method, source_ref)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        returning *`,
       [
         req.userId,
@@ -103,6 +133,9 @@ router.post('/', async (req, res) => {
         notes ?? null,
         dedupe_hash,
         external_fitid ?? null,
+        paid,
+        paymentMethod === undefined ? null : paymentMethod,
+        source_ref ?? null,
       ],
     )
     res.status(201).json(row)
@@ -124,6 +157,9 @@ router.put('/:id', async (req, res) => {
     amount: string
     account_id: string
     external_fitid: string | null
+    paid: boolean
+    payment_method: string | null
+    source_ref: string | null
   }>(`select * from ${T.transactions} where id = $1 and user_id = $2`, [req.params.id, req.userId])
 
   if (!existing) return res.status(404).json({ error: 'Transação não encontrada' })
@@ -133,6 +169,18 @@ router.put('/:id', async (req, res) => {
   const amount = body.amount != null ? toNumber(body.amount) : toNumber(existing.amount)
   const account_id = body.account_id ?? existing.account_id
   const external_fitid = body.external_fitid ?? existing.external_fitid
+  const paid = body.paid !== undefined ? (parsePaid(body.paid) ?? existing.paid) : existing.paid
+
+  let payment_method: string | null = existing.payment_method
+  if (body.payment_method !== undefined) {
+    const parsed = parsePaymentMethod(body.payment_method)
+    if (parsed === undefined) {
+      return res.status(400).json({ error: 'payment_method inválido (debit|credit)' })
+    }
+    payment_method = parsed
+  }
+
+  const source_ref = body.source_ref !== undefined ? body.source_ref : existing.source_ref
 
   const dedupe_hash = buildDedupeHash({
     userId: req.userId!,
@@ -157,6 +205,9 @@ router.put('/:id', async (req, res) => {
       notes = coalesce($12, notes),
       dedupe_hash = $13,
       external_fitid = $14,
+      paid = $15,
+      payment_method = $16,
+      source_ref = $17,
       updated_at = now()
      where id = $1 and user_id = $2
      returning *`,
@@ -175,6 +226,9 @@ router.put('/:id', async (req, res) => {
       body.notes ?? null,
       dedupe_hash,
       external_fitid ?? null,
+      paid,
+      payment_method,
+      source_ref ?? null,
     ],
   )
   res.json(row)

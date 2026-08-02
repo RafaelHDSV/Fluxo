@@ -1,5 +1,9 @@
 .env
 
+# Notion one-shot dump (PII / histórico pessoal)
+backend/scripts/data/*.json
+!backend/scripts/data/.gitkeep
+
 # Logs
 logs
 *.log

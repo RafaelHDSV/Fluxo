@@ -50,6 +50,7 @@ Fluxo é um controle financeiro pessoal web: entradas, saídas, contas, categori
 | Epic / board | https://github.com/RafaelHDSV/Fluxo/issues/1 |
 | Documentacao | `docs/especificacao.md`, `docs/DESIGN.md`, `docs/superpowers/` |
 | Gap Notion → Fluxo | `docs/superpowers/specs/2026-08-02-notion-fluxo-gap-analysis.md` |
+| Import Notion (P0–P2) | `docs/superpowers/specs/2026-08-02-notion-import-design.md` |
 
 ---
 

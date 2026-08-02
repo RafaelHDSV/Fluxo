@@ -28,7 +28,7 @@ router.get('/dashboard', async (req, res) => {
   const monthAgg = await queryOne<{ income: string; expense: string }>(
     `select
       coalesce(sum(case when type = 'income' then amount else 0 end),0) as income,
-      coalesce(sum(case when type = 'expense' then amount else 0 end),0) as expense
+      coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense
      from ${T.transactions}
      where user_id = $1 and date between $2 and $3`,
     [userId, from, to],
@@ -43,7 +43,7 @@ router.get('/dashboard', async (req, res) => {
     `select c.name, c.color, coalesce(sum(t.amount),0) as total
      from ${T.transactions} t
      join ${T.categories} c on c.id = t.category_id
-     where t.user_id = $1 and t.type = 'expense' and t.date between $2 and $3
+     where t.user_id = $1 and t.type = 'expense' and t.paid = true and t.date between $2 and $3
      group by c.name, c.color
      order by total desc
      limit 8`,
@@ -53,7 +53,7 @@ router.get('/dashboard', async (req, res) => {
   const monthly = await query(
     `select to_char(date_trunc('month', date), 'YYYY-MM') as month,
       coalesce(sum(case when type = 'income' then amount else 0 end),0) as income,
-      coalesce(sum(case when type = 'expense' then amount else 0 end),0) as expense
+      coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense
      from ${T.transactions}
      where user_id = $1 and date >= (current_date - interval '11 months')
      group by 1
@@ -85,6 +85,7 @@ router.get('/dashboard', async (req, res) => {
       coalesce((
         select sum(t.amount) from ${T.transactions} t
         where t.user_id = b.user_id and t.category_id = b.category_id and t.type = 'expense'
+          and t.paid = true
           and date_trunc('month', t.date::timestamp) = date_trunc('month', b.month::timestamp)
       ),0) as spent
      from ${T.budgets} b
@@ -139,7 +140,7 @@ router.get('/summary', async (req, res) => {
   const totals = await queryOne(
     `select
       coalesce(sum(case when type = 'income' then amount else 0 end),0) as income,
-      coalesce(sum(case when type = 'expense' then amount else 0 end),0) as expense,
+      coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense,
       count(*)::int as count
      from ${T.transactions}
      where user_id = $1 and date between $2 and $3
