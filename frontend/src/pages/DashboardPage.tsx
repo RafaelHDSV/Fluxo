@@ -91,6 +91,11 @@ export function DashboardPage() {
   const unpaidTotal = data?.unpaidTotal ?? 0
   const unpaidCount = data?.unpaidCount ?? 0
   const projectedAfterPayables = data ? data.balance - unpaidTotal : 0
+  const carryIn =
+    data?.openingBalance != null && Number.isFinite(data.openingBalance) ? data.openingBalance : 0
+  const receitasTotais = data ? data.income + carryIn : 0
+  const saldoMes = data ? receitasTotais - data.expense : 0
+  const showCarryIn = periodMode !== 'all'
 
   return (
     <div className="space-y-6">
@@ -160,19 +165,34 @@ export function DashboardPage() {
       </div>
 
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 w-full rounded-xl" />
+        <div className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+          {Array.from({ length: showCarryIn ? 6 : 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-32 w-full rounded-xl" />
           ))}
         </div>
       ) : data ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+          <div className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+            {showCarryIn && (
+              <SummaryCard
+                label="Do mês anterior"
+                value={
+                  data.openingBalance != null && Number.isFinite(data.openingBalance)
+                    ? formatBRL(data.openingBalance)
+                    : '—'
+                }
+                hint="Saldo trazido do período anterior"
+              />
+            )}
             <SummaryCard
               label="Receitas"
-              value={formatBRL(data.income)}
+              value={formatBRL(receitasTotais)}
               tone="positive"
-              hint="Tudo que entrou no período"
+              hint={
+                showCarryIn && carryIn !== 0
+                  ? `Entradas (${formatBRL(data.income)}) + mês anterior`
+                  : 'Tudo que entrou no período'
+              }
             />
             <SummaryCard
               label="Despesas"
@@ -182,32 +202,32 @@ export function DashboardPage() {
             />
             <SummaryCard
               label="Saldo do mês"
-              value={formatBRL(data.result)}
-              tone={data.result >= 0 ? 'positive' : 'negative'}
+              value={formatBRL(saldoMes)}
+              tone={saldoMes >= 0 ? 'positive' : 'negative'}
               hint="Receitas − despesas pagas"
             />
-            <div className="space-y-1">
-              <SummaryCard
-                label="Ainda a pagar"
-                value={formatBRL(unpaidTotal)}
-                tone={unpaidTotal > 0 ? 'negative' : 'default'}
-                hint={
-                  unpaidCount > 0
-                    ? `${unpaidCount} despesa(s) pendente(s)`
-                    : 'Nenhuma pendência no período'
-                }
-              />
-              {unpaidCount > 0 && (
-                <Link to="/a-pagar" className="text-xs text-warning hover:underline">
-                  Ver a pagar
-                </Link>
-              )}
-            </div>
+            <SummaryCard
+              label="Ainda a pagar"
+              value={formatBRL(unpaidTotal)}
+              tone={unpaidTotal > 0 ? 'negative' : 'default'}
+              hint={
+                unpaidCount > 0
+                  ? `${unpaidCount} despesa(s) pendente(s)`
+                  : 'Nenhuma pendência no período'
+              }
+              action={
+                unpaidCount > 0 ? (
+                  <Link to="/a-pagar" className="text-xs text-warning hover:underline">
+                    Ver a pagar
+                  </Link>
+                ) : null
+              }
+            />
             <SummaryCard
               label="Saldo após a pagar"
               value={formatBRL(projectedAfterPayables)}
               tone={projectedAfterPayables >= 0 ? 'positive' : 'negative'}
-              hint={`Saldo nas contas (${formatBRL(data.balance)}) − a pagar`}
+              hint="Contas − a pagar"
             />
           </div>
 
