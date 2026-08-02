@@ -76,7 +76,8 @@ export function PayablesPage() {
     for (const tx of items) {
       const amount = Number(tx.amount) || 0
       total += amount
-      if (tx.payment_method === 'credit') credit += amount
+      // Cartão só conta o que tem vencimento (due_date) definido
+      if (tx.payment_method === 'credit' && tx.due_date) credit += amount
       else other += amount
     }
     return { total, credit, other }
