@@ -11,6 +11,7 @@ import budgetsRoutes from './modules/budgets/budgetsRoutes.js'
 import goalsRoutes from './modules/goals/goalsRoutes.js'
 import reportsRoutes from './modules/reports/reportsRoutes.js'
 import wishlistRoutes from './modules/wishlist/wishlistRoutes.js'
+import descriptionRulesRoutes from './modules/descriptionRules/descriptionRulesRoutes.js'
 
 const app = express()
 
@@ -28,6 +29,7 @@ app.use('/api/accounts', accountsRoutes)
 app.use('/api/categories', categoriesRoutes)
 app.use('/api/transactions', transactionsRoutes)
 app.use('/api/imports', importsRoutes)
+app.use('/api/description-rules', descriptionRulesRoutes)
 app.use('/api/budgets', budgetsRoutes)
 app.use('/api/goals', goalsRoutes)
 app.use('/api/wishlist', wishlistRoutes)

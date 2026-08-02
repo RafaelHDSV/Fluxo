@@ -5,7 +5,8 @@ import { T } from '../../lib/tables.js'
 import { buildDedupeHash, toNumber } from '../../lib/money.js'
 import { requireAuth } from '../../middleware/auth.js'
 import { suggestCategoryId } from '../categories/suggestCategory.js'
-import { parseCsv, parseOfx } from './parsers.js'
+import { applyDescriptionRules } from './applyDescriptionRules.js'
+import { parseCsv, parseOfx, parseOfxLedgerBalance } from './parsers.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } })
 const router = Router()
@@ -37,28 +38,31 @@ router.post('/preview', upload.single('file'), async (req, res) => {
 
   const rows = []
   for (const p of parsed) {
+    const original_description = p.description
+    const description = await applyDescriptionRules(req.userId!, original_description)
     const dedupe_hash = buildDedupeHash({
       userId: req.userId!,
       date: p.date,
       amount: p.amount,
-      description: p.description,
+      description: original_description,
       accountId,
       fitid: p.external_fitid,
     })
-    const suggested_category_id = await suggestCategoryId(req.userId!, p.description)
+    const suggested_category_id = await suggestCategoryId(req.userId!, description)
     const is_duplicate = existingSet.has(dedupe_hash)
     const inserted = await queryOne(
       `insert into ${T.importRows}
-        (import_id, user_id, raw, date, description, amount, type, external_fitid, dedupe_hash,
+        (import_id, user_id, raw, date, description, original_description, amount, type, external_fitid, dedupe_hash,
          suggested_category_id, is_duplicate, selected)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        returning *`,
       [
         imp!.id,
         req.userId,
         JSON.stringify(p.raw),
         p.date,
-        p.description,
+        description,
+        original_description,
         p.amount,
         p.type,
         p.external_fitid ?? null,
@@ -71,7 +75,11 @@ router.post('/preview', upload.single('file'), async (req, res) => {
     rows.push(inserted)
   }
 
-  res.status(201).json({ import: imp, rows })
+  res.status(201).json({
+    import: imp,
+    rows,
+    ledger_balance: isOfx ? parseOfxLedgerBalance(content) : null,
+  })
 })
 
 router.get('/:id', async (req, res) => {
@@ -81,10 +89,43 @@ router.get('/:id', async (req, res) => {
   ])
   if (!imp) return res.status(404).json({ error: 'Importação não encontrada' })
   const rows = await query(
-    `select * from ${T.importRows} where import_id = $1 and user_id = $2 order by date`,
+    `select * from ${T.importRows} where import_id = $1 and user_id = $2 order by date, created_at`,
     [req.params.id, req.userId],
   )
   res.json({ import: imp, rows })
+})
+
+router.patch('/:id/rows/:rowId', async (req, res) => {
+  const body = req.body ?? {}
+  const sets: string[] = []
+  const vals: unknown[] = [req.params.rowId, req.params.id, req.userId]
+  let i = 4
+
+  if (typeof body.description === 'string') {
+    sets.push(`description = $${i++}`)
+    vals.push(body.description.trim())
+  }
+  if (typeof body.selected === 'boolean') {
+    sets.push(`selected = $${i++}`)
+    vals.push(body.selected)
+  }
+  if (body.suggested_category_id !== undefined) {
+    sets.push(`suggested_category_id = $${i++}`)
+    vals.push(body.suggested_category_id || null)
+  }
+
+  if (sets.length === 0) {
+    return res.status(400).json({ error: 'Nenhum campo para atualizar' })
+  }
+
+  const row = await queryOne(
+    `update ${T.importRows} set ${sets.join(', ')}
+     where id = $1 and import_id = $2 and user_id = $3
+     returning *`,
+    vals,
+  )
+  if (!row) return res.status(404).json({ error: 'Linha não encontrada' })
+  res.json(row)
 })
 
 router.post('/:id/commit', async (req, res) => {
@@ -117,13 +158,17 @@ router.post('/:id/commit', async (req, res) => {
   }>(sql, params)
 
   let created = 0
+  let skippedNoCategory = 0
   for (const row of rows) {
-    if (!row.suggested_category_id) continue
+    if (!row.suggested_category_id) {
+      skippedNoCategory += 1
+      continue
+    }
     try {
-      await queryOne(
+      const inserted = await queryOne(
         `insert into ${T.transactions}
-          (user_id, date, description, amount, type, category_id, account_id, tags, dedupe_hash, external_fitid, import_id)
-         values ($1,$2,$3,$4,$5,$6,$7,'{}',$8,$9,$10)
+          (user_id, date, description, amount, type, category_id, account_id, tags, dedupe_hash, external_fitid, import_id, paid, payment_method)
+         values ($1,$2,$3,$4,$5,$6,$7,'{}',$8,$9,$10,true,'debit')
          on conflict (user_id, dedupe_hash) do nothing
          returning id`,
         [
@@ -139,14 +184,30 @@ router.post('/:id/commit', async (req, res) => {
           imp.id,
         ],
       )
-      created += 1
+      if (inserted) created += 1
     } catch {
       // skip individual failures
     }
   }
 
   await queryOne(`update ${T.imports} set status = 'committed' where id = $1`, [imp.id])
-  res.json({ created, skipped: rows.length - created })
+
+  const ledgerRaw = req.body?.ledger_balance
+  const ledger = ledgerRaw == null || ledgerRaw === '' ? null : Number(ledgerRaw)
+  if (ledger != null && Number.isFinite(ledger)) {
+    await queryOne(`update ${T.accounts} set balance = $1 where id = $2 and user_id = $3`, [
+      ledger,
+      imp.account_id,
+      req.userId,
+    ])
+  }
+
+  res.json({
+    created,
+    skipped: rows.length - created,
+    skipped_no_category: skippedNoCategory,
+    ledger_balance: ledger,
+  })
 })
 
 export default router

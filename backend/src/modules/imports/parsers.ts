@@ -80,14 +80,23 @@ export function parseOfx(content: string): ParsedRow[] {
       const trnamt = get('TRNAMT')
       const amount = Math.abs(Number(trnamt.replace(',', '.')) || 0)
       const type = Number(trnamt) < 0 ? 'expense' : 'income'
+      const fitidRaw = get('FITID') || null
       return {
         date: parseDate(get('DTPOSTED')),
         description: get('MEMO') || get('NAME') || 'OFX',
         amount,
         type: type as 'income' | 'expense',
-        external_fitid: get('FITID') || null,
+        external_fitid: fitidRaw && fitidRaw !== '000000' ? fitidRaw : null,
         raw: { FITID: get('FITID'), TRNAMT: trnamt, MEMO: get('MEMO') },
       }
     })
     .filter((r) => r.date && r.amount > 0)
+}
+
+/** Saldo do extrato OFX (`LEDGERBAL` / `BALAMT`), se presente. */
+export function parseOfxLedgerBalance(content: string): number | null {
+  const m = content.match(/<LEDGERBAL>[\s\S]*?<BALAMT>([^\n<]+)/i)
+  if (!m) return null
+  const n = Number(String(m[1]).trim().replace(',', '.'))
+  return Number.isFinite(n) ? n : null
 }

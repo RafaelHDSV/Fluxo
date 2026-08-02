@@ -30,6 +30,8 @@ export const api = {
     request<T>(path, { method: 'POST', body: JSON.stringify(body ?? {}) }),
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PUT', body: JSON.stringify(body ?? {}) }),
+  patch: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PATCH', body: JSON.stringify(body ?? {}) }),
   delete: (path: string) => request<void>(path, { method: 'DELETE' }),
   upload: async <T>(path: string, form: FormData) => {
     const { data } = await supabase.auth.getSession()

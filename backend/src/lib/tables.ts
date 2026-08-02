@@ -10,4 +10,5 @@ export const T = {
   wishlist: 'fluxo_wishlist',
   imports: 'fluxo_imports',
   importRows: 'fluxo_import_rows',
+  descriptionRules: 'fluxo_description_rules',
 } as const

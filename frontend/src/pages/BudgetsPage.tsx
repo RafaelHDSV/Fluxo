@@ -1,7 +1,4 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
-import { Trash2 } from 'lucide-react'
-import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -24,7 +21,6 @@ import {
 } from '@/components/ui/table'
 import { formatBRL, todayISO } from '@/lib/format'
 import { currentYearMonth, periodBounds } from '@/lib/period'
-import { labelOf, matchTypeLabel } from '@/lib/labels'
 import { api } from '@/services/api'
 
 type Category = { id: string; name: string; kind: string; color?: string | null; icon?: string | null }
@@ -35,7 +31,6 @@ type Budget = {
   amount_limit: string | number
   spent?: string | number
 }
-type Rule = { id: string; category_id: string; match_type: string; pattern: string }
 
 type CategoryStat = {
   id: string
@@ -67,15 +62,10 @@ function expenseMap(summary: Summary) {
 export function BudgetsPage() {
   const { year, month } = currentYearMonth()
   const [stats, setStats] = useState<CategoryStat[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [rules, setRules] = useState<Rule[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [catForm, setCatForm] = useState({ name: '', kind: 'expense' })
-  const [ruleForm, setRuleForm] = useState({ category_id: '', match_type: 'contains', pattern: '' })
   const [editingBudget, setEditingBudget] = useState<Record<string, string>>({})
-  const [deleteRuleId, setDeleteRuleId] = useState<string | null>(null)
-  const [deletingRule, setDeletingRule] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -88,10 +78,9 @@ export function BudgetsPage() {
         rows = null
       }
 
-      const [cats, budgets, rulesRes, monthSummary, yearSummary, allSummary] = await Promise.all([
+      const [cats, budgets, monthSummary, yearSummary, allSummary] = await Promise.all([
         api.get<Category[]>('/api/categories'),
         api.get<Budget[]>('/api/budgets'),
-        api.get<Rule[]>('/api/categories/rules'),
         api.get<Summary>(
           `/api/reports/summary?from=${periodBounds('month', year, month).from}&to=${periodBounds('month', year, month).to}`,
         ),
@@ -100,10 +89,6 @@ export function BudgetsPage() {
         ),
         api.get<Summary>(`/api/reports/summary?from=2000-01-01&to=${todayISO()}`),
       ])
-
-      setCategories(cats)
-      setRules(rulesRes)
-      setRuleForm((r) => ({ ...r, category_id: r.category_id || cats[0]?.id || '' }))
 
       if (rows?.length) {
         setStats(rows)
@@ -159,27 +144,6 @@ export function BudgetsPage() {
       return next
     })
     await load()
-  }
-
-  async function createRule(e: FormEvent) {
-    e.preventDefault()
-    await api.post('/api/categories/rules', ruleForm)
-    setRuleForm((r) => ({ ...r, pattern: '' }))
-    await load()
-  }
-
-  async function confirmDeleteRule() {
-    if (!deleteRuleId) return
-    setDeletingRule(true)
-    try {
-      await api.delete(`/api/categories/rules/${deleteRuleId}`)
-      setDeleteRuleId(null)
-      await load()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao excluir regra')
-    } finally {
-      setDeletingRule(false)
-    }
   }
 
   return (
@@ -328,107 +292,6 @@ export function BudgetsPage() {
           )}
         </CardContent>
       </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Regras de categorização</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Se a descrição do lançamento contém um texto, o Fluxo sugere essa categoria na importação.
-          </p>
-          <form onSubmit={createRule} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-2">
-              <Label>Categoria</Label>
-              <Select
-                value={ruleForm.category_id}
-                onValueChange={(v) => setRuleForm({ ...ruleForm, category_id: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Tipo</Label>
-              <Select
-                value={ruleForm.match_type}
-                onValueChange={(v) => setRuleForm({ ...ruleForm, match_type: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(matchTypeLabel).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>
-                      {v}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="rule-pattern">Texto na descrição</Label>
-              <Input
-                id="rule-pattern"
-                value={ruleForm.pattern}
-                onChange={(e) => setRuleForm({ ...ruleForm, pattern: e.target.value })}
-                placeholder="Uber"
-                required
-              />
-            </div>
-            <div className="flex items-end">
-              <Button type="submit">Criar regra</Button>
-            </div>
-          </form>
-          {rules.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma regra cadastrada.</p>
-          ) : (
-            <ul className="space-y-2 text-sm">
-              {rules.map((r) => (
-                <li
-                  key={r.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2"
-                >
-                  <span>
-                    <Badge variant="muted" className="mr-2">
-                      {labelOf(matchTypeLabel, r.match_type)}
-                    </Badge>
-                    “{r.pattern}” → {categories.find((c) => c.id === r.category_id)?.name || r.category_id}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    type="button"
-                    aria-label="Excluir regra"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => setDeleteRuleId(r.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      <ConfirmDialog
-        open={deleteRuleId != null}
-        onOpenChange={(open) => !open && setDeleteRuleId(null)}
-        title="Excluir regra?"
-        description="A regra deixa de ser usada nas importações."
-        confirmLabel="Excluir"
-        onConfirm={confirmDeleteRule}
-        loading={deletingRule}
-      />
     </div>
   )
 }

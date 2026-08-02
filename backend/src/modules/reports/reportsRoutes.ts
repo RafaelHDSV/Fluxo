@@ -46,22 +46,40 @@ router.get('/dashboard', async (req, res) => {
      where user_id = $1 and archived = false and type <> 'credit_card'`,
     [userId],
   )
+  const accountBalance = toNumber(balanceRow?.sum)
 
-  // Saldo inicial do período = resultado acumulado de tudo antes do período (carryover automático)
-  const openingRow =
-    bounds.period === 'all'
-      ? { sum: '0' }
-      : await queryOne<{ sum: string }>(
-          `select coalesce(sum(case
-             when type = 'income' then amount
-             when type = 'adjustment' then amount
-             when type = 'expense' and paid = true then -amount
-             else 0 end), 0) as sum
-           from ${T.transactions}
-           where user_id = $1 and date < $2::date`,
-          [userId, from],
-        )
-  const openingBalance = toNumber(openingRow?.sum)
+  // Âncora: saldo das contas (editável / atualizado via OFX LEDGERBAL).
+  // Não usar soma histórica de lançamentos — Notion/import incompleto distorce o carryover.
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const periodIncludesToday =
+    bounds.period !== 'all' && Boolean(bounds.from && bounds.to && bounds.from <= today && bounds.to >= today)
+
+  let openingBalance = 0
+  let closingBalance = accountBalance
+  let balancesFromAccounts = false
+
+  if (bounds.period === 'all') {
+    openingBalance = 0
+    closingBalance = accountBalance
+  } else if (periodIncludesToday) {
+    const asOf = today < to ? today : to
+    const mtdNet = await queryOne<{ sum: string }>(
+      `select coalesce(sum(case
+         when type = 'income' then amount
+         when type = 'adjustment' then amount
+         when type = 'expense' and paid = true then -amount
+         else 0 end), 0) as sum
+       from ${T.transactions}
+       where user_id = $1 and date between $2::date and $3::date`,
+      [userId, from, asOf],
+    )
+    openingBalance = accountBalance - toNumber(mtdNet?.sum)
+    balancesFromAccounts = true
+  } else {
+    // Mês/ano passado: sem âncora confiável no ledger Notion — não inventar saldo inicial
+    openingBalance = Number.NaN
+    closingBalance = Number.NaN
+  }
 
   const monthAgg = await queryOne<{ income: string; expense: string; adjustments: string }>(
     `select
@@ -77,8 +95,12 @@ router.get('/dashboard', async (req, res) => {
   const expense = toNumber(monthAgg?.expense)
   const adjustments = toNumber(monthAgg?.adjustments)
   const result = income - expense
-  const closingBalance = openingBalance + result + adjustments
+  if (balancesFromAccounts || bounds.period === 'all') {
+    closingBalance = openingBalance + result + adjustments
+  }
   const savingsRate = income > 0 ? (result / income) * 100 : 0
+
+  const cashflowOpening = Number.isFinite(openingBalance) ? openingBalance : 0
 
   const byCategory = await query(
     `select c.name, c.color, coalesce(sum(t.amount),0) as total
@@ -117,14 +139,14 @@ router.get('/dashboard', async (req, res) => {
        group by date::date
      ) s
      order by d`,
-    [userId, from, to, openingBalance],
+    [userId, from, to, cashflowOpening],
   )
   // Garante ponto inicial no gráfico mesmo sem lançamentos no período
   const periodCashflow =
-    bounds.period === 'all'
+    bounds.period === 'all' || !Number.isFinite(openingBalance)
       ? periodCashflowRaw
       : periodCashflowRaw.length === 0 || periodCashflowRaw[0]?.date !== from
-        ? [{ date: from, result: String(openingBalance) }, ...periodCashflowRaw]
+        ? [{ date: from, result: String(cashflowOpening) }, ...periodCashflowRaw]
         : periodCashflowRaw
 
   const upcomingCards = await query(
@@ -198,9 +220,10 @@ router.get('/dashboard', async (req, res) => {
 
   res.json({
     period: { from: bounds.from, to: bounds.to, mode: bounds.period },
-    balance: toNumber(balanceRow?.sum),
-    openingBalance,
-    closingBalance,
+    balance: accountBalance,
+    openingBalance: Number.isFinite(openingBalance) ? openingBalance : null,
+    closingBalance: Number.isFinite(closingBalance) ? closingBalance : null,
+    balancesAnchored: balancesFromAccounts || bounds.period === 'all',
     income,
     expense,
     adjustments,

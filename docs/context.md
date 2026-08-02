@@ -40,10 +40,11 @@ Fluxo é um controle financeiro pessoal web: entradas, saídas, contas, categori
 4. Gráficos: Apache ECharts
 5. Tailwind + shadcn com tema dark/light
 6. **Entrada de dados mensal:** OFX da conta Santander (Money 2000+); CSV/OFX genérico também
-7. Orçamentos = categorias + metas de gasto + regras de categorização (auto-sugestão na importação)
+7. Orçamentos = categorias + metas de gasto; **regras de nome e categoria ficam em Importações**
 8. Investimentos = ex-Metas (`fluxo_goals`) — caixinhas com progresso
 9. Notion foi carga inicial histórica; **não é fonte operacional**
-10. **Carryover mensal automático:** saldo inicial do período = resultado acumulado anterior (sem lançar “Reajuste de conta”)
+10. **Saldo das contas** é a âncora (editável; OFX pode atualizar via `LEDGERBAL`). Saldo inicial do mês corrente = saldo atual − movimento do mês até hoje — **não** a soma histórica do Notion
+11. Importação: preview aplica regras de rename → categoria; **stepper** revisa descrição/categoria das linhas novas antes do commit
 
 ---
 

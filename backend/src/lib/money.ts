@@ -17,8 +17,9 @@ export function buildDedupeHash(input: {
   accountId: string
   fitid?: string | null
 }) {
-  const base = input.fitid
-    ? `${input.userId}|fitid|${input.fitid}|${input.accountId}`
+  const fitid = input.fitid && input.fitid !== '000000' ? input.fitid : null
+  const base = fitid
+    ? `${input.userId}|fitid|${fitid}|${input.accountId}`
     : [
         input.userId,
         input.date,

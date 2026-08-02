@@ -23,8 +23,9 @@ import { cn } from '@/lib/utils'
 
 type Dashboard = {
   balance: number
-  openingBalance?: number
-  closingBalance?: number
+  openingBalance?: number | null
+  closingBalance?: number | null
+  balancesAnchored?: boolean
   income: number
   expense: number
   adjustments?: number
@@ -185,11 +186,15 @@ export function DashboardPage() {
       ) : data ? (
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {periodMode !== 'all' && (
+            <div className="space-y-1">
+              <SummaryCard label="Saldo nas contas" value={formatBRL(data.balance)} />
+              <p className="text-xs text-muted-foreground">Saldo atual cadastrado nas contas.</p>
+            </div>
+            {periodMode !== 'all' && data.openingBalance != null && (
               <div className="space-y-1">
-                <SummaryCard label="Saldo inicial" value={formatBRL(data.openingBalance ?? 0)} />
+                <SummaryCard label="Saldo inicial" value={formatBRL(data.openingBalance)} />
                 <p className="text-xs text-muted-foreground">
-                  Saldo que sobrou do período anterior.
+                  Estimado a partir do saldo atual menos o movimento do período.
                 </p>
               </div>
             )}
@@ -208,18 +213,18 @@ export function DashboardPage() {
                 tone={data.result >= 0 ? 'positive' : 'negative'}
               />
             </div>
-            {periodMode !== 'all' && (
+            {periodMode !== 'all' && data.closingBalance != null && (
               <div className="space-y-1">
                 <SummaryCard
-                  label="Saldo final"
-                  value={formatBRL(data.closingBalance ?? data.balance)}
-                  tone={(data.closingBalance ?? 0) >= 0 ? 'positive' : 'negative'}
+                  label="Saldo final (projetado)"
+                  value={formatBRL(data.closingBalance)}
+                  tone={data.closingBalance >= 0 ? 'positive' : 'negative'}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Inicial + receitas − despesas pagas do mês.
+                </p>
               </div>
             )}
-            <div className="space-y-1">
-              <SummaryCard label="Saldo nas contas" value={formatBRL(data.balance)} />
-            </div>
             <div className="space-y-1">
               <SummaryCard label="Taxa de economia" value={`${data.savingsRate.toFixed(1)}%`} />
             </div>
