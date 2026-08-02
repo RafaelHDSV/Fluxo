@@ -269,13 +269,25 @@ export function TransactionsPage() {
     }
   }
 
+  /** Mantém data/tipo/conta/meio/etc.; limpa só o que costuma mudar entre lançamentos. */
+  function formForNextEntry(base: typeof emptyForm) {
+    return {
+      ...emptyForm,
+      date: base.date || todayISO(),
+      type: base.type,
+      category_id: base.category_id,
+      account_id: base.account_id,
+      card_account_id: base.card_account_id,
+      due_date: base.due_date,
+      transfer_account_id: base.transfer_account_id,
+      paid: base.paid,
+      payment_method: base.payment_method,
+    }
+  }
+
   function cancelEdit() {
     setEditingId(null)
-    setForm({
-      ...emptyForm,
-      account_id: form.account_id,
-      category_id: form.category_id,
-    })
+    setForm((f) => formForNextEntry(f))
   }
 
   async function onSubmit(e: FormEvent) {
@@ -299,8 +311,12 @@ export function TransactionsPage() {
       }
       if (editingId) await api.put(`/api/transactions/${editingId}`, payload)
       else await api.post('/api/transactions', payload)
-      cancelEdit()
+      setEditingId(null)
+      setForm((f) => formForNextEntry(f))
       await load()
+      requestAnimationFrame(() => {
+        document.getElementById('tx-desc')?.focus()
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao salvar')
     }
