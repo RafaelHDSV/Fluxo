@@ -43,7 +43,7 @@ Fluxo é um controle financeiro pessoal web: entradas, saídas, contas, categori
 7. Orçamentos = categorias + metas de gasto; **regras de nome e categoria ficam em Importações**
 8. Investimentos = ex-Metas (`fluxo_goals`) — caixinhas com progresso
 9. Notion foi carga inicial histórica; **não é fonte operacional**
-10. **Saldo das contas** é a âncora (editável; OFX pode atualizar via `LEDGERBAL`). Saldo inicial do mês corrente = saldo atual − movimento do mês até hoje — **não** a soma histórica do Notion
+10. **Saldo das contas** é a âncora (editável; OFX via `LEDGERBAL`; débito pago ajusta o saldo). Saldo inicial do mês = saldo atual − movimento de caixa do mês (`date`, sem crédito) — **não** a soma histórica do Notion
 11. Importação: preview aplica regras de rename → categoria; **stepper** revisa descrição/categoria das linhas novas antes do commit
 12. **Crédito:** `date` = data da compra; `due_date` = vencimento da fatura (ciclo `closing_day` + `due_day` do cartão). Resultado, orçamentos e filtros de período usam a data efetiva (`coalesce` do vencimento no crédito). Histórico antigo sem `due_date` continua em `date`
 

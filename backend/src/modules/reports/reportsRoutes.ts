@@ -66,18 +66,21 @@ router.get('/dashboard', async (req, res) => {
     openingBalance = 0
     closingBalance = accountBalance
   } else if (periodIncludesToday) {
-    const asOf = today < to ? today : to
-    const mtdNet = await queryOne<{ sum: string }>(
+    // Saldo inicial = saldo atual das contas − movimento de caixa do período.
+    // Usa `date` (não vencimento do crédito): cartão não mexe na conta corrente.
+    // Mesma janela do card de despesas do mês (`from`→`to`), para bater com o total exibido.
+    const cashNet = await queryOne<{ sum: string }>(
       `select coalesce(sum(case
          when type = 'income' then amount
          when type = 'adjustment' then amount
-         when type = 'expense' and paid = true then -amount
+         when type = 'expense' and paid = true
+           and coalesce(payment_method, 'debit') <> 'credit' then -amount
          else 0 end), 0) as sum
        from ${T.transactions}
-       where user_id = $1 and ${EFF} between $2::date and $3::date`,
-      [userId, from, asOf],
+       where user_id = $1 and date between $2::date and $3::date`,
+      [userId, from, to],
     )
-    openingBalance = accountBalance - toNumber(mtdNet?.sum)
+    openingBalance = accountBalance - toNumber(cashNet?.sum)
     balancesFromAccounts = true
   } else {
     // Mês/ano passado: sem âncora confiável no ledger Notion — não inventar saldo inicial

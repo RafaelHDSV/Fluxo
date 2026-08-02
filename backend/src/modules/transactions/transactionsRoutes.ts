@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { applyAccountBalanceDelta, checkingCashDelta } from '../../lib/accountCash.js'
 import { computeCreditDueDate, effectiveDateSql } from '../../lib/creditCycle.js'
 import { query, queryOne } from '../../lib/db.js'
 import { buildDedupeHash, toNumber } from '../../lib/money.js'
@@ -215,6 +216,7 @@ router.post('/', async (req, res) => {
     fitid: external_fitid,
   })
 
+  const amountNum = toNumber(amount)
   try {
     const row = await queryOne(
       `insert into ${T.transactions}
@@ -226,7 +228,7 @@ router.post('/', async (req, res) => {
         req.userId,
         date,
         description,
-        toNumber(amount),
+        amountNum,
         type,
         categoryId,
         account_id,
@@ -241,6 +243,11 @@ router.post('/', async (req, res) => {
         source_ref ?? null,
         dueResolved.due_date,
       ],
+    )
+    await applyAccountBalanceDelta(
+      req.userId!,
+      account_id,
+      checkingCashDelta({ type, amount: amountNum, paid, paymentMethod: resolvedMethod }),
     )
     res.status(201).json(row)
   } catch (error: unknown) {
@@ -259,6 +266,7 @@ router.put('/:id', async (req, res) => {
     date: string
     description: string
     amount: string
+    type: string
     account_id: string
     external_fitid: string | null
     paid: boolean
@@ -273,6 +281,7 @@ router.put('/:id', async (req, res) => {
   const date = body.date ?? existing.date
   const description = body.description ?? existing.description
   const amount = body.amount != null ? toNumber(body.amount) : toNumber(existing.amount)
+  const type = (body.type as string | undefined) ?? existing.type
   const account_id = body.account_id ?? existing.account_id
   const external_fitid = body.external_fitid ?? existing.external_fitid
   const paid = body.paid !== undefined ? (parsePaid(body.paid) ?? existing.paid) : existing.paid
@@ -285,6 +294,19 @@ router.put('/:id', async (req, res) => {
     }
     payment_method = parsed
   }
+
+  const oldCash = checkingCashDelta({
+    type: existing.type,
+    amount: toNumber(existing.amount),
+    paid: existing.paid,
+    paymentMethod: existing.payment_method,
+  })
+  const newCash = checkingCashDelta({
+    type,
+    amount,
+    paid,
+    paymentMethod: payment_method,
+  })
 
   const cardAccountId =
     body.card_account_id !== undefined ? body.card_account_id : existing.card_account_id
@@ -367,7 +389,7 @@ router.put('/:id', async (req, res) => {
       date,
       description,
       amount,
-      body.type ?? null,
+      type,
       body.category_id ?? null,
       account_id,
       body.transfer_account_id ?? null,
@@ -382,15 +404,46 @@ router.put('/:id', async (req, res) => {
       finalDue,
     ],
   )
+
+  // Reverte efeito antigo e aplica o novo (conta pode ter mudado)
+  if (existing.account_id === account_id) {
+    await applyAccountBalanceDelta(req.userId!, account_id, newCash - oldCash)
+  } else {
+    await applyAccountBalanceDelta(req.userId!, existing.account_id, -oldCash)
+    await applyAccountBalanceDelta(req.userId!, account_id, newCash)
+  }
+
   res.json(row)
 })
 
 router.delete('/:id', async (req, res) => {
-  const row = await queryOne(`delete from ${T.transactions} where id = $1 and user_id = $2 returning id`, [
+  const existing = await queryOne<{
+    id: string
+    type: string
+    amount: string
+    paid: boolean
+    payment_method: string | null
+    account_id: string
+  }>(`select id, type, amount, paid, payment_method, account_id from ${T.transactions} where id = $1 and user_id = $2`, [
     req.params.id,
     req.userId,
   ])
-  if (!row) return res.status(404).json({ error: 'Transação não encontrada' })
+  if (!existing) return res.status(404).json({ error: 'Transação não encontrada' })
+
+  await queryOne(`delete from ${T.transactions} where id = $1 and user_id = $2 returning id`, [
+    req.params.id,
+    req.userId,
+  ])
+  await applyAccountBalanceDelta(
+    req.userId!,
+    existing.account_id,
+    -checkingCashDelta({
+      type: existing.type,
+      amount: toNumber(existing.amount),
+      paid: existing.paid,
+      paymentMethod: existing.payment_method,
+    }),
+  )
   res.status(204).send()
 })
 
@@ -403,12 +456,36 @@ router.post('/bulk-delete', async (req, res) => {
   if (cleaned.length === 0) {
     return res.status(400).json({ error: 'ids inválidos' })
   }
+  const existing = await query<{
+    id: string
+    type: string
+    amount: string
+    paid: boolean
+    payment_method: string | null
+    account_id: string
+  }>(
+    `select id, type, amount, paid, payment_method, account_id from ${T.transactions}
+     where user_id = $1 and id = any($2::uuid[])`,
+    [req.userId, cleaned],
+  )
   const deleted = await query<{ id: string }>(
     `delete from ${T.transactions}
      where user_id = $1 and id = any($2::uuid[])
      returning id`,
     [req.userId, cleaned],
   )
+  for (const row of existing) {
+    await applyAccountBalanceDelta(
+      req.userId!,
+      row.account_id,
+      -checkingCashDelta({
+        type: row.type,
+        amount: toNumber(row.amount),
+        paid: row.paid,
+        paymentMethod: row.payment_method,
+      }),
+    )
+  }
   res.json({ deleted: deleted.length })
 })
 
@@ -425,6 +502,19 @@ router.post('/bulk-paid', async (req, res) => {
   if (cleaned.length === 0) {
     return res.status(400).json({ error: 'ids inválidos' })
   }
+
+  const before = await query<{
+    id: string
+    amount: string
+    paid: boolean
+    payment_method: string | null
+    account_id: string
+  }>(
+    `select id, amount, paid, payment_method, account_id from ${T.transactions}
+     where user_id = $1 and id = any($2::uuid[]) and type = 'expense'`,
+    [req.userId, cleaned],
+  )
+
   const updated = await query<{ id: string }>(
     `update ${T.transactions}
      set paid = $3, updated_at = now()
@@ -432,6 +522,24 @@ router.post('/bulk-paid', async (req, res) => {
      returning id`,
     [req.userId, cleaned, paid],
   )
+
+  for (const row of before) {
+    if (row.paid === paid) continue
+    const oldCash = checkingCashDelta({
+      type: 'expense',
+      amount: toNumber(row.amount),
+      paid: row.paid,
+      paymentMethod: row.payment_method,
+    })
+    const newCash = checkingCashDelta({
+      type: 'expense',
+      amount: toNumber(row.amount),
+      paid,
+      paymentMethod: row.payment_method,
+    })
+    await applyAccountBalanceDelta(req.userId!, row.account_id, newCash - oldCash)
+  }
+
   res.json({ updated: updated.length })
 })
 
