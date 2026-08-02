@@ -29,7 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { computeCreditDueDate } from '@/lib/creditCycle'
-import { formatDate, formatMonth, formatSignedBRL, todayISO } from '@/lib/format'
+import { formatBRL, formatDate, formatMonth, formatSignedBRL, todayISO } from '@/lib/format'
 import { currentYearMonth, periodBounds, type PeriodMode } from '@/lib/period'
 import { labelOf, paymentMethodLabel, transactionTypeLabel } from '@/lib/labels'
 import { cn } from '@/lib/utils'
@@ -144,6 +144,7 @@ export function TransactionsPage() {
   const skipOffsetReset = useRef(true)
   const selectionAnchorRef = useRef<number | null>(null)
   const shiftClickRef = useRef(false)
+  const amountCacheRef = useRef(new Map<string, number>())
 
   const isIncomeOnly = type === 'income'
   const isExpenseForm = form.type === 'expense'
@@ -164,6 +165,20 @@ export function TransactionsPage() {
   const pageIds = useMemo(() => items.map((t) => t.id), [items])
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
   const somePageSelected = pageIds.some((id) => selectedIds.has(id))
+
+  useEffect(() => {
+    for (const tx of items) {
+      amountCacheRef.current.set(tx.id, Number(tx.amount) || 0)
+    }
+  }, [items])
+
+  const selectedTotal = useMemo(() => {
+    let sum = 0
+    for (const id of selectedIds) {
+      sum += amountCacheRef.current.get(id) ?? 0
+    }
+    return sum
+  }, [selectedIds, items])
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(q), 350)
@@ -795,8 +810,13 @@ export function TransactionsPage() {
 
           {selectedIds.size > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
-              <span>
-                {selectedIds.size} selecionada{selectedIds.size === 1 ? '' : 's'}
+              <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span>
+                  {selectedIds.size} selecionada{selectedIds.size === 1 ? '' : 's'}
+                </span>
+                <span className="font-mono tabular-nums font-semibold">
+                  Total {formatBRL(selectedTotal)}
+                </span>
               </span>
               <div className="flex flex-wrap gap-2">
                 <Button

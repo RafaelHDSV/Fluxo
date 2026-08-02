@@ -69,7 +69,18 @@ export function PayablesPage() {
   )
   const accountMap = useMemo(() => Object.fromEntries(accounts.map((a) => [a.id, a.name])), [accounts])
 
-  const total = useMemo(() => items.reduce((sum, tx) => sum + Number(tx.amount), 0), [items])
+  const totals = useMemo(() => {
+    let total = 0
+    let credit = 0
+    let other = 0
+    for (const tx of items) {
+      const amount = Number(tx.amount) || 0
+      total += amount
+      if (tx.payment_method === 'credit') credit += amount
+      else other += amount
+    }
+    return { total, credit, other }
+  }, [items])
 
   async function load() {
     setLoading(true)
@@ -179,17 +190,45 @@ export function PayablesPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-muted-foreground">Total pendente</CardTitle>
+            <CardTitle className="text-base text-muted-foreground">Total a pagar</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <Skeleton className="h-8 w-32" />
             ) : (
               <p className="font-mono text-2xl font-semibold tabular-nums text-destructive">
-                {formatBRL(total)}
+                {formatBRL(totals.total)}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-muted-foreground">No cartão</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <p className="font-mono text-2xl font-semibold tabular-nums">
+                {formatBRL(totals.credit)}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-muted-foreground">Débito / outros</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <p className="font-mono text-2xl font-semibold tabular-nums">
+                {formatBRL(totals.other)}
               </p>
             )}
           </CardContent>
