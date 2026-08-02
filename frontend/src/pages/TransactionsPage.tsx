@@ -25,9 +25,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { formatBRL, formatDate, formatMonth, todayISO } from '@/lib/format'
+import { formatBRL, formatDate, formatMonth, formatSignedBRL, todayISO } from '@/lib/format'
 import { currentYearMonth, periodBounds, type PeriodMode } from '@/lib/period'
 import { labelOf, paymentMethodLabel, transactionTypeLabel } from '@/lib/labels'
+import { cn } from '@/lib/utils'
 import { api } from '@/services/api'
 
 type Account = { id: string; name: string }
@@ -581,8 +582,14 @@ export function TransactionsPage() {
                                 )}
                               </TableCell>
                             )}
-                            <TableCell className="text-right font-mono tabular-nums">
-                              {formatBRL(tx.amount)}
+                            <TableCell
+                              className={cn(
+                                'text-right font-mono tabular-nums',
+                                tx.type === 'income' && 'text-primary',
+                                tx.type === 'expense' && 'text-destructive',
+                              )}
+                            >
+                              {formatSignedBRL(tx.amount, tx.type)}
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-1">

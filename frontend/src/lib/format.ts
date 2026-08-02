@@ -5,6 +5,17 @@ export function formatBRL(value: number | string) {
   )
 }
 
+/** Valor com sinal explícito: receita +, despesa −. */
+export function formatSignedBRL(
+  value: number | string,
+  type: 'income' | 'expense' | 'transfer' | 'adjustment' | string,
+) {
+  const formatted = formatBRL(value)
+  if (type === 'income') return `+${formatted}`
+  if (type === 'expense') return `-${formatted}`
+  return formatted
+}
+
 export function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
