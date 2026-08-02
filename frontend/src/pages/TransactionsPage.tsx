@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { formatBRL, formatDate, formatMonth, formatSignedBRL, todayISO } from '@/lib/format'
+import { formatDate, formatMonth, formatSignedBRL, todayISO } from '@/lib/format'
 import { currentYearMonth, periodBounds, type PeriodMode } from '@/lib/period'
 import { labelOf, paymentMethodLabel, transactionTypeLabel } from '@/lib/labels'
 import { cn } from '@/lib/utils'
@@ -68,34 +68,68 @@ function monthKey(date: string) {
   return String(date).slice(0, 7)
 }
 
+function parsePeriodMode(raw: string | null): PeriodMode {
+  if (raw === 'month' || raw === 'year' || raw === 'all') return raw
+  return 'all'
+}
+
+function parseFilterMode(raw: string | null): 'all' | 'a_pagar' {
+  return raw === 'a_pagar' ? 'a_pagar' : 'all'
+}
+
+function colSpanFor(showMeio: boolean, isIncomeOnly: boolean) {
+  // checkbox + data + desc + cat + conta + tipo + [meio] + [pago] + valor + ações
+  let n = 8
+  if (showMeio) n += 1
+  if (!isIncomeOnly) n += 1
+  return n
+}
+
 export function TransactionsPage() {
-  const [searchParams] = useSearchParams()
-  const initialType = searchParams.get('type') || ''
+  const [searchParams, setSearchParams] = useSearchParams()
   const { year: defaultYear, month: defaultMonth } = currentYearMonth()
 
   const [items, setItems] = useState<Tx[]>([])
   const [total, setTotal] = useState(0)
-  const [offset, setOffset] = useState(0)
+  const [offset, setOffset] = useState(() => {
+    const page = Number(searchParams.get('page') || '1')
+    return Number.isFinite(page) && page > 1 ? (page - 1) * PAGE_SIZE : 0
+  })
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [q, setQ] = useState('')
-  const [debouncedQ, setDebouncedQ] = useState('')
-  const [type, setType] = useState(initialType)
-  const [filterMode, setFilterMode] = useState<'all' | 'a_pagar'>('all')
-  const [periodMode, setPeriodMode] = useState<PeriodMode>('all')
-  const [periodYear, setPeriodYear] = useState(defaultYear)
-  const [periodMonth, setPeriodMonth] = useState(defaultMonth)
+  const [q, setQ] = useState(() => searchParams.get('q') || '')
+  const [debouncedQ, setDebouncedQ] = useState(() => searchParams.get('q') || '')
+  const [type, setType] = useState(() => searchParams.get('type') || '')
+  const [filterMode, setFilterMode] = useState<'all' | 'a_pagar'>(() =>
+    parseFilterMode(searchParams.get('vista')),
+  )
+  const [periodMode, setPeriodMode] = useState<PeriodMode>(() =>
+    parsePeriodMode(searchParams.get('period')),
+  )
+  const [periodYear, setPeriodYear] = useState(() => {
+    const y = Number(searchParams.get('year'))
+    return Number.isFinite(y) && y > 2000 ? y : defaultYear
+  })
+  const [periodMonth, setPeriodMonth] = useState(() => {
+    const m = Number(searchParams.get('month'))
+    return Number.isFinite(m) && m >= 1 && m <= 12 ? m : defaultMonth
+  })
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const formCardRef = useRef<HTMLDivElement>(null)
+  const skipUrlWrite = useRef(true)
+  const skipOffsetReset = useRef(true)
 
   const isIncomeOnly = type === 'income'
   const isExpenseForm = form.type === 'expense'
   const showMeioColumn = !isIncomeOnly
+  const tableColSpan = colSpanFor(showMeioColumn, isIncomeOnly)
 
   const categoryMap = useMemo(
     () => Object.fromEntries(categories.map((c) => [c.id, c.name])),
@@ -103,14 +137,55 @@ export function TransactionsPage() {
   )
   const accountMap = useMemo(() => Object.fromEntries(accounts.map((a) => [a.id, a.name])), [accounts])
 
+  const pageIds = useMemo(() => items.map((t) => t.id), [items])
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
+  const somePageSelected = pageIds.some((id) => selectedIds.has(id))
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(q), 350)
     return () => clearTimeout(t)
   }, [q])
 
   useEffect(() => {
+    if (skipOffsetReset.current) {
+      skipOffsetReset.current = false
+      return
+    }
     setOffset(0)
   }, [debouncedQ, type, filterMode, periodMode, periodYear, periodMonth])
+
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [debouncedQ, type, filterMode, periodMode, periodYear, periodMonth, offset])
+
+  // Persiste filtros na URL
+  useEffect(() => {
+    if (skipUrlWrite.current) {
+      skipUrlWrite.current = false
+      return
+    }
+    const next = new URLSearchParams()
+    if (debouncedQ) next.set('q', debouncedQ)
+    if (type) next.set('type', type)
+    if (filterMode === 'a_pagar') next.set('vista', 'a_pagar')
+    if (filterMode === 'all' && periodMode !== 'all') {
+      next.set('period', periodMode)
+      next.set('year', String(periodYear))
+      if (periodMode === 'month') next.set('month', String(periodMonth))
+    }
+    const page = Math.floor(offset / PAGE_SIZE) + 1
+    if (page > 1) next.set('page', String(page))
+    setSearchParams(next, { replace: true })
+  }, [
+    debouncedQ,
+    type,
+    filterMode,
+    periodMode,
+    periodYear,
+    periodMonth,
+    offset,
+    setSearchParams,
+  ])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -201,12 +276,54 @@ export function TransactionsPage() {
     try {
       await api.delete(`/api/transactions/${deleteId}`)
       setDeleteId(null)
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(deleteId)
+        return next
+      })
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao excluir')
     } finally {
       setDeleting(false)
     }
+  }
+
+  async function confirmBulkDelete() {
+    if (selectedIds.size === 0) return
+    setDeleting(true)
+    try {
+      await api.post<{ deleted: number }>('/api/transactions/bulk-delete', {
+        ids: Array.from(selectedIds),
+      })
+      setBulkDeleteOpen(false)
+      setSelectedIds(new Set())
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao excluir selecionadas')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  function toggleSelect(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
+
+  function toggleSelectAllPage(checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      for (const id of pageIds) {
+        if (checked) next.add(id)
+        else next.delete(id)
+      }
+      return next
+    })
   }
 
   async function togglePaid(tx: Tx) {
@@ -514,6 +631,27 @@ export function TransactionsPage() {
             )}
           </div>
 
+          {selectedIds.size > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+              <span>
+                {selectedIds.size} selecionada{selectedIds.size === 1 ? '' : 's'}
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setSelectedIds(new Set())}>
+                  Limpar seleção
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setBulkDeleteOpen(true)}
+                >
+                  Excluir selecionadas
+                </Button>
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <div className="space-y-2">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -530,6 +668,13 @@ export function TransactionsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={allPageSelected ? true : somePageSelected ? 'indeterminate' : false}
+                          onCheckedChange={(c) => toggleSelectAllPage(c === true)}
+                          aria-label="Selecionar página"
+                        />
+                      </TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Descrição</TableHead>
                       <TableHead>Categoria</TableHead>
@@ -545,12 +690,19 @@ export function TransactionsPage() {
                     {groupedRows.map((group) => (
                       <Fragment key={group.key}>
                         <TableRow className="bg-muted/40 hover:bg-muted/40">
-                          <TableCell colSpan={showMeioColumn ? (isIncomeOnly ? 8 : 9) : isIncomeOnly ? 7 : 8}>
+                          <TableCell colSpan={tableColSpan}>
                             <span className="text-sm font-semibold">{group.label}</span>
                           </TableCell>
                         </TableRow>
                         {group.items.map((tx) => (
-                          <TableRow key={tx.id}>
+                          <TableRow key={tx.id} data-state={selectedIds.has(tx.id) ? 'selected' : undefined}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedIds.has(tx.id)}
+                                onCheckedChange={(c) => toggleSelect(tx.id, c === true)}
+                                aria-label={`Selecionar ${tx.description}`}
+                              />
+                            </TableCell>
                             <TableCell>{formatDate(tx.date)}</TableCell>
                             <TableCell>{tx.description}</TableCell>
                             <TableCell>{categoryMap[tx.category_id] || '—'}</TableCell>
@@ -624,6 +776,7 @@ export function TransactionsPage() {
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
                 <span>
                   {total} lançamento(s) · página {page} de {totalPages}
+                  {selectedIds.size > 0 ? ` · ${selectedIds.size} selecionada(s)` : ''}
                 </span>
                 <div className="flex gap-2">
                   <Button
@@ -658,6 +811,15 @@ export function TransactionsPage() {
         description="Esta ação não pode ser desfeita."
         confirmLabel="Excluir"
         onConfirm={confirmDelete}
+        loading={deleting}
+      />
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title={`Excluir ${selectedIds.size} lançamento(s)?`}
+        description="As transações selecionadas serão removidas permanentemente."
+        confirmLabel="Excluir selecionadas"
+        onConfirm={confirmBulkDelete}
         loading={deleting}
       />
     </div>
