@@ -1,13 +1,23 @@
 import { ArrowDownRight, ArrowUpRight, CreditCard, Receipt, Wallet } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DashboardCharts } from '@/components/charts/DashboardCharts'
 import { SummaryCard } from '@/components/SummaryCard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatBRL, formatDeltaPct } from '@/lib/format'
+import { currentYearMonth, periodBounds, type PeriodMode } from '@/lib/period'
 import { api } from '@/services/api'
 import { cn } from '@/lib/utils'
 
@@ -25,7 +35,8 @@ type Dashboard = {
   unpaidTotal?: number
   byCategory: Array<{ name: string; color?: string; total: string | number }>
   monthly: Array<{ month: string; income: string | number; expense: string | number }>
-  balanceSeries: Array<{ date: string; balance: string | number }>
+  periodCashflow?: Array<{ date: string; result: string | number }>
+  balanceSeries?: Array<{ date: string; balance: string | number }>
   upcomingCards: Array<{ name: string; due_day: number }>
   alerts: Array<{ level: string; message: string }>
   goals: Array<{ name: string; current_amount: string | number; target_amount: string | number }>
@@ -53,18 +64,39 @@ function DeltaHint({ value, invert }: { value: number | null | undefined; invert
 }
 
 export function DashboardPage() {
+  const { year: defaultYear, month: defaultMonth } = currentYearMonth()
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('month')
+  const [year, setYear] = useState(defaultYear)
+  const [month, setMonth] = useState(defaultMonth)
   const [data, setData] = useState<Dashboard | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  const periodLabel = useMemo(() => periodBounds(periodMode, year, month).label, [periodMode, year, month])
+
   useEffect(() => {
     setLoading(true)
+    setError('')
+    const params = new URLSearchParams()
+    params.set('period', periodMode)
+    if (periodMode !== 'all') {
+      params.set('year', String(year))
+      if (periodMode === 'month') params.set('month', String(month))
+    }
     api
-      .get<Dashboard>('/api/reports/dashboard')
+      .get<Dashboard>(`/api/reports/dashboard?${params}`)
       .then(setData)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Erro ao carregar painel'))
+      .catch((e) => setError(e instanceof Error ? e.message : 'Erro ao carregar dashboard'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [periodMode, year, month])
+
+  const cashflow = useMemo(() => {
+    if (data?.periodCashflow?.length) return data.periodCashflow
+    if (data?.balanceSeries?.length) {
+      return data.balanceSeries.map((b) => ({ date: b.date, result: b.balance }))
+    }
+    return []
+  }, [data])
 
   const shortcuts = [
     { to: '/transactions?type=income', label: 'Receitas', icon: Wallet },
@@ -72,11 +104,60 @@ export function DashboardPage() {
     { to: '/a-pagar', label: 'A pagar', icon: CreditCard },
   ]
 
+  const yearOptions = Array.from({ length: 5 }, (_, i) => defaultYear - 2 + i)
+
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-2xl font-semibold tracking-tight">Painel</h1>
-        <p className="text-muted-foreground">Para onde seu dinheiro está indo este mês?</p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">Para onde seu dinheiro está indo — {periodLabel}.</p>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Período</Label>
+            <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as PeriodMode)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">Mês</SelectItem>
+                <SelectItem value="year">Ano</SelectItem>
+                <SelectItem value="all">Todo o histórico</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {periodMode !== 'all' && (
+            <div className="space-y-1">
+              <Label className="text-xs">Ano</Label>
+              <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {periodMode === 'month' && (
+            <div className="space-y-1">
+              <Label className="text-xs">Mês</Label>
+              <Input
+                type="number"
+                min={1}
+                max={12}
+                className="w-[72px]"
+                value={month}
+                onChange={(e) => setMonth(Math.min(12, Math.max(1, Number(e.target.value) || 1)))}
+              />
+            </div>
+          )}
+        </div>
       </header>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -105,16 +186,16 @@ export function DashboardPage() {
               <SummaryCard label="Saldo atual" value={formatBRL(data.balance)} />
             </div>
             <div className="space-y-1">
-              <SummaryCard label="Receitas do mês" value={formatBRL(data.income)} tone="positive" />
-              <DeltaHint value={data.incomeDeltaPct} />
+              <SummaryCard label="Receitas" value={formatBRL(data.income)} tone="positive" />
+              {periodMode === 'month' && <DeltaHint value={data.incomeDeltaPct} />}
             </div>
             <div className="space-y-1">
-              <SummaryCard label="Despesas do mês" value={formatBRL(data.expense)} tone="negative" />
-              <DeltaHint value={data.expenseDeltaPct} invert />
+              <SummaryCard label="Despesas" value={formatBRL(data.expense)} tone="negative" />
+              {periodMode === 'month' && <DeltaHint value={data.expenseDeltaPct} invert />}
             </div>
             <div className="space-y-1">
               <SummaryCard
-                label="Resultado mensal"
+                label="Resultado"
                 value={formatBRL(data.result)}
                 tone={data.result >= 0 ? 'positive' : 'negative'}
               />
@@ -122,7 +203,7 @@ export function DashboardPage() {
             <div className="space-y-1">
               <SummaryCard label="Taxa de economia" value={`${data.savingsRate.toFixed(1)}%`} />
             </div>
-            {(data.unpaidCount ?? 0) > 0 && (
+            {(data.unpaidCount ?? 0) > 0 && periodMode === 'month' && (
               <div className="space-y-1">
                 <SummaryCard label="A pagar (mês)" value={formatBRL(data.unpaidTotal ?? 0)} tone="negative" />
                 <Link to="/a-pagar" className="text-xs text-warning hover:underline">
@@ -160,7 +241,8 @@ export function DashboardPage() {
               <DashboardCharts
                 monthly={data.monthly || []}
                 byCategory={data.byCategory || []}
-                balanceSeries={data.balanceSeries || []}
+                cashflow={cashflow}
+                loading={loading}
               />
             </CardContent>
           </Card>
@@ -188,11 +270,16 @@ export function DashboardPage() {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Metas</CardTitle>
+                <CardTitle className="text-base">Investimentos</CardTitle>
               </CardHeader>
               <CardContent>
                 {(data.goals?.length ?? 0) === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhuma meta ainda.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Nenhuma caixinha ainda.{' '}
+                    <Link to="/investments" className="text-primary hover:underline">
+                      Criar investimento
+                    </Link>
+                  </p>
                 ) : (
                   <div className="space-y-4">
                     {data.goals.map((g) => {

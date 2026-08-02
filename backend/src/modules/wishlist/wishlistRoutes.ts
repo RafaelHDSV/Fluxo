@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const body = req.body ?? {}
-  const { name, price, saved_amount = 0, category, url, purchased = false, source_ref } = body
+  const { name, price, saved_amount = 0, category, url, purchased = false, source_ref, image_url } = body
   if (!name || price == null) {
     return res.status(400).json({ error: 'name e price são obrigatórios' })
   }
@@ -34,8 +34,8 @@ router.post('/', async (req, res) => {
   try {
     const row = await queryOne(
       `insert into ${T.wishlist}
-        (user_id, name, price, saved_amount, category, url, purchased, source_ref)
-       values ($1,$2,$3,$4,$5,$6,$7,$8)
+        (user_id, name, price, saved_amount, category, url, purchased, source_ref, image_url)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        returning *`,
       [
         req.userId,
@@ -46,6 +46,7 @@ router.post('/', async (req, res) => {
         url ?? null,
         Boolean(purchased),
         source_ref ?? null,
+        image_url ?? null,
       ],
     )
     res.status(201).json(row)
@@ -68,6 +69,7 @@ router.put('/:id', async (req, res) => {
       category = coalesce($6, category),
       url = coalesce($7, url),
       purchased = coalesce($8, purchased),
+      image_url = coalesce($9, image_url),
       updated_at = now()
      where id = $1 and user_id = $2
      returning *`,
@@ -80,6 +82,7 @@ router.put('/:id', async (req, res) => {
       body.category !== undefined ? body.category : null,
       body.url !== undefined ? body.url : null,
       body.purchased !== undefined ? Boolean(body.purchased) : null,
+      body.image_url !== undefined ? body.image_url : null,
     ],
   )
   if (!row) return res.status(404).json({ error: 'Item não encontrado' })
@@ -114,6 +117,7 @@ router.post('/import', async (req, res) => {
     const saved = toNumber(raw.saved_amount ?? raw['Valor Guardado'] ?? raw.saved ?? 0)
     const category = raw.category ?? raw.Categoria ?? null
     const url = raw.url ?? raw.URL ?? raw.Link ?? null
+    const image_url = raw.image_url ?? raw.imageUrl ?? raw.Capa ?? null
     const purchased = Boolean(raw.purchased ?? (raw.Comprado === 'Yes' || raw.Comprado === true))
     const source_ref = (raw.source_ref ?? raw.url_page ?? raw.page_url ?? null) as string | null
 
@@ -124,16 +128,33 @@ router.post('/import', async (req, res) => {
           [req.userId, source_ref],
         )
         if (existing) {
+          if (image_url) {
+            await queryOne(
+              `update ${T.wishlist} set image_url = coalesce($3, image_url), updated_at = now()
+               where id = $1 and user_id = $2 returning id`,
+              [(existing as { id: string }).id, req.userId, typeof image_url === 'string' ? image_url : null],
+            )
+          }
           skipped += 1
           continue
         }
       }
       const row = await queryOne(
         `insert into ${T.wishlist}
-          (user_id, name, price, saved_amount, category, url, purchased, source_ref)
-         values ($1,$2,$3,$4,$5,$6,$7,$8)
+          (user_id, name, price, saved_amount, category, url, purchased, source_ref, image_url)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
          returning id`,
-        [req.userId, name, price, saved, category, url, purchased, source_ref],
+        [
+          req.userId,
+          name,
+          price,
+          saved,
+          category,
+          url,
+          purchased,
+          source_ref,
+          typeof image_url === 'string' ? image_url : null,
+        ],
       )
       if (row) inserted += 1
       else skipped += 1

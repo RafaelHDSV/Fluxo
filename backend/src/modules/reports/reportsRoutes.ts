@@ -15,8 +15,29 @@ function currentMonthBounds() {
   return { from, to }
 }
 
+function resolvePeriod(query: Record<string, unknown>): { from: string | null; to: string | null; period: string } {
+  const period = typeof query.period === 'string' ? query.period : 'month'
+  const now = new Date()
+  const yearRaw = typeof query.year === 'string' ? Number(query.year) : now.getFullYear()
+  const monthRaw = typeof query.month === 'string' ? Number(query.month) : now.getMonth() + 1
+  const year = Number.isFinite(yearRaw) ? Math.trunc(yearRaw) : now.getFullYear()
+  const month = Number.isFinite(monthRaw) ? Math.min(12, Math.max(1, Math.trunc(monthRaw))) : now.getMonth() + 1
+
+  if (period === 'all') return { from: null, to: null, period: 'all' }
+  if (period === 'year') {
+    return { from: `${year}-01-01`, to: `${year}-12-31`, period: 'year' }
+  }
+  const last = new Date(year, month, 0)
+  const from = `${year}-${String(month).padStart(2, '0')}-01`
+  const to = `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`
+  return { from, to, period: 'month' }
+}
+
 router.get('/dashboard', async (req, res) => {
-  const { from, to } = currentMonthBounds()
+  const bounds = resolvePeriod(req.query as Record<string, unknown>)
+  const fallback = currentMonthBounds()
+  const from = bounds.from ?? '2000-01-01'
+  const to = bounds.to ?? '2100-12-31'
   const userId = req.userId
   const now = new Date()
 
@@ -56,21 +77,28 @@ router.get('/dashboard', async (req, res) => {
       coalesce(sum(case when type = 'income' then amount else 0 end),0) as income,
       coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense
      from ${T.transactions}
-     where user_id = $1 and date >= (current_date - interval '11 months')
+     where user_id = $1 and date between $2 and $3
      group by 1
      order by 1`,
-    [userId],
+    [userId, from, to],
   )
 
-  const balanceSeries = await query(
-    `select date::text as date,
-      sum(case when type in ('income','adjustment') then amount when type = 'expense' then -amount else 0 end)
-        over (order by date, created_at) as balance
-     from ${T.transactions}
-     where user_id = $1
-     order by date
-     limit 120`,
-    [userId],
+  const periodCashflow = await query(
+    `select d::text as date,
+      sum(daily) over (order by d) as result
+     from (
+       select date::date as d,
+         coalesce(sum(case
+           when type = 'income' then amount
+           when type = 'expense' and paid = true then -amount
+           when type = 'adjustment' then amount
+           else 0 end), 0) as daily
+       from ${T.transactions}
+       where user_id = $1 and date between $2 and $3
+       group by date::date
+     ) s
+     order by d`,
+    [userId, from, to],
   )
 
   const upcomingCards = await query(
@@ -81,6 +109,7 @@ router.get('/dashboard', async (req, res) => {
     [userId],
   )
 
+  const budgetMonth = bounds.period === 'month' ? from : fallback.from
   const budgets = await query(
     `select b.*, c.name as category_name,
       coalesce((
@@ -92,7 +121,7 @@ router.get('/dashboard', async (req, res) => {
      from ${T.budgets} b
      join ${T.categories} c on c.id = b.category_id
      where b.user_id = $1 and b.month = $2::date`,
-    [userId, from],
+    [userId, budgetMonth],
   )
 
   const alerts = (budgets as Array<{ category_name: string; spent: string; amount_limit: string }>)
@@ -138,11 +167,11 @@ router.get('/dashboard', async (req, res) => {
     `select count(*)::text as count, coalesce(sum(amount),0) as total
      from ${T.transactions}
      where user_id = $1 and type = 'expense' and paid = false and date between $2 and $3`,
-    [userId, from, to],
+    [userId, bounds.period === 'all' ? from : bounds.from ?? fallback.from, bounds.period === 'all' ? to : bounds.to ?? fallback.to],
   )
 
   res.json({
-    period: { from, to },
+    period: { from: bounds.from, to: bounds.to, mode: bounds.period },
     balance: toNumber(balanceRow?.sum),
     income,
     expense,
@@ -156,7 +185,8 @@ router.get('/dashboard', async (req, res) => {
     unpaidTotal: toNumber(unpaidRow?.total),
     byCategory,
     monthly,
-    balanceSeries,
+    periodCashflow,
+    balanceSeries: periodCashflow,
     upcomingCards,
     budgets,
     alerts,

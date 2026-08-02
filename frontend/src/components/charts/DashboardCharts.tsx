@@ -5,7 +5,7 @@ import { formatBRL, formatDate, formatMonth } from '@/lib/format'
 type Props = {
   monthly: Array<{ month: string; income: string | number; expense: string | number }>
   byCategory: Array<{ name: string; color?: string; total: string | number }>
-  balanceSeries: Array<{ date: string; balance: string | number }>
+  cashflow: Array<{ date: string; result: string | number }>
   loading?: boolean
 }
 
@@ -18,7 +18,7 @@ function EmptyChart({ title, message }: { title: string; message: string }) {
   )
 }
 
-export function DashboardCharts({ monthly, byCategory, balanceSeries, loading }: Props) {
+export function DashboardCharts({ monthly, byCategory, cashflow, loading }: Props) {
   if (loading) {
     return (
       <div className="grid gap-6 lg:grid-cols-2">
@@ -31,7 +31,7 @@ export function DashboardCharts({ monthly, byCategory, balanceSeries, loading }:
 
   const hasMonthly = monthly.some((m) => Number(m.income) > 0 || Number(m.expense) > 0)
   const hasCategory = byCategory.some((c) => Number(c.total) > 0)
-  const hasBalance = balanceSeries.length > 0
+  const hasCashflow = cashflow.length > 0
 
   const bars = {
     backgroundColor: 'transparent',
@@ -39,12 +39,14 @@ export function DashboardCharts({ monthly, byCategory, balanceSeries, loading }:
     tooltip: {
       trigger: 'axis',
       formatter: (params: Array<{ seriesName: string; value: number }>) =>
-        params
-          .map((p) => `${p.seriesName}: ${formatBRL(p.value)}`)
-          .join('<br/>'),
+        params.map((p) => `${p.seriesName}: ${formatBRL(p.value)}`).join('<br/>'),
     },
-    legend: { data: ['Receitas', 'Despesas'], textStyle: { color: '#8b9aab' } },
-    grid: { left: 48, right: 16, top: 40, bottom: 30 },
+    legend: {
+      data: ['Receitas', 'Despesas'],
+      top: 8,
+      textStyle: { color: '#8b9aab' },
+    },
+    grid: { left: 48, right: 16, top: 56, bottom: 30 },
     xAxis: { type: 'category', data: monthly.map((m) => formatMonth(m.month)) },
     yAxis: {
       type: 'value',
@@ -94,13 +96,13 @@ export function DashboardCharts({ monthly, byCategory, balanceSeries, loading }:
       trigger: 'axis',
       formatter: (params: Array<{ axisValue: string; value: number }>) => {
         const p = params[0]
-        return `${formatDate(p.axisValue)}<br/>Saldo: ${formatBRL(p.value)}`
+        return `${formatDate(p.axisValue)}<br/>Resultado: ${formatBRL(p.value)}`
       },
     },
     grid: { left: 48, right: 16, top: 24, bottom: 30 },
     xAxis: {
       type: 'category',
-      data: balanceSeries.map((b) => b.date),
+      data: cashflow.map((b) => b.date),
       axisLabel: { formatter: (v: string) => formatDate(v) },
     },
     yAxis: {
@@ -111,7 +113,7 @@ export function DashboardCharts({ monthly, byCategory, balanceSeries, loading }:
       {
         type: 'line',
         smooth: true,
-        data: balanceSeries.map((b) => Number(b.balance)),
+        data: cashflow.map((b) => Number(b.result)),
         areaStyle: { color: 'rgba(61, 220, 151, 0.18)' },
         lineStyle: { color: '#3ddc97', width: 2 },
         itemStyle: { color: '#3ddc97' },
@@ -139,11 +141,11 @@ export function DashboardCharts({ monthly, byCategory, balanceSeries, loading }:
         )}
       </div>
       <div className="lg:col-span-2">
-        <h3 className="mb-2 font-medium">Evolução do saldo</h3>
-        {hasBalance ? (
+        <h3 className="mb-2 font-medium">Resultado no período</h3>
+        {hasCashflow ? (
           <ReactECharts option={line} style={{ height: 260 }} />
         ) : (
-          <EmptyChart title="Evolução do saldo" message="Cadastre transações para ver a evolução." />
+          <EmptyChart title="Resultado no período" message="Cadastre transações para ver o resultado acumulado." />
         )}
       </div>
     </div>

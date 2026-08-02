@@ -1,4 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react'
+import { Archive, Pencil } from 'lucide-react'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,7 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatBRL } from '@/lib/format'
-import { accountTypeLabel, categoryKindLabel, labelOf, matchTypeLabel } from '@/lib/labels'
+import { accountTypeLabel, labelOf } from '@/lib/labels'
 import { api } from '@/services/api'
 
 type Account = {
@@ -33,9 +35,6 @@ type Account = {
   credit_limit?: string | number | null
 }
 
-type Category = { id: string; name: string; kind: string }
-type Rule = { id: string; category_id: string; match_type: string; pattern: string }
-
 const emptyAccountForm = {
   name: '',
   type: 'checking',
@@ -46,28 +45,18 @@ const emptyAccountForm = {
 
 export function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [rules, setRules] = useState<Rule[]>([])
   const [form, setForm] = useState(emptyAccountForm)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [catName, setCatName] = useState('')
-  const [rule, setRule] = useState({ category_id: '', match_type: 'contains', pattern: '' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [archiveId, setArchiveId] = useState<string | null>(null)
+  const [archiving, setArchiving] = useState(false)
 
   async function load() {
     setLoading(true)
     setError('')
     try {
-      const [accs, cats, rls] = await Promise.all([
-        api.get<Account[]>('/api/accounts'),
-        api.get<Category[]>('/api/categories'),
-        api.get<Rule[]>('/api/categories/rules'),
-      ])
-      setAccounts(accs)
-      setCategories(cats)
-      setRules(rls)
-      setRule((r) => ({ ...r, category_id: r.category_id || cats[0]?.id || '' }))
+      setAccounts(await api.get<Account[]>('/api/accounts'))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro')
     } finally {
@@ -106,25 +95,25 @@ export function AccountsPage() {
     })
   }
 
-  async function createCategory(e: FormEvent) {
-    e.preventDefault()
-    await api.post('/api/categories', { name: catName, kind: 'expense' })
-    setCatName('')
-    await load()
-  }
-
-  async function createRule(e: FormEvent) {
-    e.preventDefault()
-    await api.post('/api/categories/rules', rule)
-    setRule((r) => ({ ...r, pattern: '' }))
-    await load()
+  async function confirmArchive() {
+    if (!archiveId) return
+    setArchiving(true)
+    try {
+      await api.delete(`/api/accounts/${archiveId}`)
+      setArchiveId(null)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao arquivar')
+    } finally {
+      setArchiving(false)
+    }
   }
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="font-display text-2xl font-semibold tracking-tight">Contas e categorias</h1>
-        <p className="text-muted-foreground">Origens do dinheiro, cartões e regras de categorização.</p>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">Contas</h1>
+        <p className="text-muted-foreground">Contas correntes, cartões e carteiras — origens do seu dinheiro.</p>
       </header>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -227,7 +216,7 @@ export function AccountsPage() {
                     <TableHead>Tipo</TableHead>
                     <TableHead className="text-right">Saldo</TableHead>
                     <TableHead>Venc.</TableHead>
-                    <TableHead />
+                    <TableHead className="w-[88px]" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -240,9 +229,27 @@ export function AccountsPage() {
                       <TableCell className="text-right font-mono tabular-nums">{formatBRL(a.balance)}</TableCell>
                       <TableCell>{a.due_day ?? '—'}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm" type="button" onClick={() => startEditAccount(a)}>
-                          Editar
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            type="button"
+                            aria-label="Editar"
+                            onClick={() => startEditAccount(a)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            type="button"
+                            aria-label="Arquivar"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setArchiveId(a.id)}
+                          >
+                            <Archive className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -253,99 +260,15 @@ export function AccountsPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Categorias</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form onSubmit={createCategory} className="flex flex-wrap items-end gap-3">
-            <div className="min-w-[200px] flex-1 space-y-2">
-              <Label htmlFor="cat-name">Nome</Label>
-              <Input id="cat-name" value={catName} onChange={(e) => setCatName(e.target.value)} required />
-            </div>
-            <Button type="submit">Adicionar</Button>
-          </form>
-          {categories.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma categoria.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {categories.map((c) => (
-                <Badge key={c.id} variant="outline">
-                  {c.name}
-                  <span className="ml-1 text-muted-foreground">({labelOf(categoryKindLabel, c.kind)})</span>
-                </Badge>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Regras de categorização</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form onSubmit={createRule} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-2">
-              <Label>Categoria</Label>
-              <Select value={rule.category_id} onValueChange={(v) => setRule({ ...rule, category_id: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Tipo</Label>
-              <Select value={rule.match_type} onValueChange={(v) => setRule({ ...rule, match_type: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(matchTypeLabel).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>
-                      {v}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="rule-pattern">Padrão</Label>
-              <Input
-                id="rule-pattern"
-                value={rule.pattern}
-                onChange={(e) => setRule({ ...rule, pattern: e.target.value })}
-                placeholder="Uber"
-                required
-              />
-            </div>
-            <div className="flex items-end">
-              <Button type="submit">Criar regra</Button>
-            </div>
-          </form>
-          {rules.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma regra cadastrada.</p>
-          ) : (
-            <ul className="space-y-2 text-sm">
-              {rules.map((r) => (
-                <li key={r.id} className="rounded-lg border border-border px-3 py-2">
-                  <Badge variant="muted" className="mr-2">
-                    {labelOf(matchTypeLabel, r.match_type)}
-                  </Badge>
-                  “{r.pattern}” → {categories.find((c) => c.id === r.category_id)?.name || r.category_id}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <ConfirmDialog
+        open={archiveId != null}
+        onOpenChange={(open) => !open && setArchiveId(null)}
+        title="Arquivar conta?"
+        description="A conta deixa de aparecer nas listagens, mas o histórico de lançamentos é preservado."
+        confirmLabel="Arquivar"
+        onConfirm={confirmArchive}
+        loading={archiving}
+      />
     </div>
   )
 }

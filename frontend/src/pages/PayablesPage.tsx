@@ -2,6 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -11,7 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { currentMonthBounds, formatBRL, formatDate, formatMonth } from '@/lib/format'
+import { formatBRL, formatDate } from '@/lib/format'
+import { currentYearMonth, periodBounds } from '@/lib/period'
 import { labelOf, paymentMethodLabel } from '@/lib/labels'
 import { api } from '@/services/api'
 
@@ -30,9 +40,13 @@ type Tx = {
 
 type TxResponse = { items: Tx[]; total: number }
 
+type PayablesFilter = 'current' | 'month' | 'all'
+
 export function PayablesPage() {
-  const { from, to } = currentMonthBounds()
-  const monthLabel = formatMonth(from, 'long')
+  const { year: defaultYear, month: defaultMonth } = currentYearMonth()
+  const [filter, setFilter] = useState<PayablesFilter>('current')
+  const [pickYear, setPickYear] = useState(defaultYear)
+  const [pickMonth, setPickMonth] = useState(defaultMonth)
 
   const [items, setItems] = useState<Tx[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -40,6 +54,12 @@ export function PayablesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
+
+  const periodLabel = useMemo(() => {
+    if (filter === 'all') return 'todo o histórico'
+    if (filter === 'current') return periodBounds('month', defaultYear, defaultMonth).label
+    return periodBounds('month', pickYear, pickMonth).label
+  }, [filter, defaultYear, defaultMonth, pickYear, pickMonth])
 
   const categoryMap = useMemo(
     () => Object.fromEntries(categories.map((c) => [c.id, c.name])),
@@ -56,11 +76,16 @@ export function PayablesPage() {
       const params = new URLSearchParams({
         type: 'expense',
         paid: 'false',
-        from,
-        to,
-        limit: '200',
+        limit: '500',
         offset: '0',
       })
+      if (filter !== 'all') {
+        const y = filter === 'current' ? defaultYear : pickYear
+        const m = filter === 'current' ? defaultMonth : pickMonth
+        const { from, to } = periodBounds('month', y, m)
+        if (from) params.set('from', from)
+        if (to) params.set('to', to)
+      }
       const [txRes, accs, cats] = await Promise.all([
         api.get<TxResponse>(`/api/transactions?${params}`),
         api.get<Account[]>('/api/accounts'),
@@ -78,7 +103,7 @@ export function PayablesPage() {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [filter, pickYear, pickMonth])
 
   async function markPaid(tx: Tx) {
     setBusyId(tx.id)
@@ -92,16 +117,64 @@ export function PayablesPage() {
     }
   }
 
+  const yearOptions = Array.from({ length: 5 }, (_, i) => defaultYear - 2 + i)
+
   return (
     <div className="space-y-6">
       <header>
         <h1 className="font-display text-2xl font-semibold tracking-tight">A pagar</h1>
-        <p className="text-muted-foreground">
-          Despesas não pagas de {monthLabel}.
-        </p>
+        <p className="text-muted-foreground">Despesas não pagas — {periodLabel}.</p>
       </header>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <Card>
+        <CardContent className="flex flex-wrap items-end gap-4 pt-6">
+          <div className="space-y-2">
+            <Label>Período</Label>
+            <Select value={filter} onValueChange={(v) => setFilter(v as PayablesFilter)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current">Mês atual</SelectItem>
+                <SelectItem value="month">Escolher mês</SelectItem>
+                <SelectItem value="all">Todo o histórico</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {filter === 'month' && (
+            <>
+              <div className="space-y-2">
+                <Label>Ano</Label>
+                <Select value={String(pickYear)} onValueChange={(v) => setPickYear(Number(v))}>
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {yearOptions.map((y) => (
+                      <SelectItem key={y} value={String(y)}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Mês</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={12}
+                  className="w-[72px]"
+                  value={pickMonth}
+                  onChange={(e) => setPickMonth(Math.min(12, Math.max(1, Number(e.target.value) || 1)))}
+                />
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
@@ -144,7 +217,9 @@ export function PayablesPage() {
               ))}
             </div>
           ) : items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma despesa pendente neste mês. Tudo em dia!</p>
+            <p className="text-sm text-muted-foreground">
+              Nenhuma despesa pendente neste período. Tudo em dia!
+            </p>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border">
               <Table>

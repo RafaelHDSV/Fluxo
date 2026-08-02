@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
+import { FileUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,6 +34,13 @@ type ImportRow = {
   is_duplicate: boolean
   selected: boolean
 }
+
+const SANTANDER_STEPS = [
+  'Acesse o Internet Banking do Santander',
+  'Vá em Conta corrente → Extrato',
+  'Exporte no formato Money 2000 ou superior (.OFX)',
+  'Envie o arquivo abaixo na conta de destino correta',
+]
 
 export function ImportsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -98,12 +106,28 @@ export function ImportsPage() {
     <div className="space-y-6">
       <header>
         <h1 className="font-display text-2xl font-semibold tracking-tight">Importações</h1>
-        <p className="text-muted-foreground">CSV e OFX com preview, mapeamento automático e dedupe.</p>
+        <p className="text-muted-foreground">Importe extratos OFX ou CSV com preview e deduplicação.</p>
       </header>
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Enviar arquivo</CardTitle>
+          <CardTitle className="text-base">Como exportar do Santander</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+            {SANTANDER_STEPS.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileUp className="h-4 w-4" />
+            Enviar arquivo
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={onPreview} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -123,11 +147,11 @@ export function ImportsPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="import-file">Arquivo</Label>
+              <Label htmlFor="import-file">Arquivo OFX ou CSV</Label>
               <Input
                 id="import-file"
                 type="file"
-                accept=".csv,.ofx,text/csv"
+                accept=".csv,.ofx,text/csv,application/x-ofx"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 required
               />

@@ -1,6 +1,7 @@
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Pencil, Trash2 } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import notionDump from '@/data/notion-wishlist.json'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,6 +20,7 @@ type WishItem = {
   saved_amount: string | number
   category: string | null
   url: string | null
+  image_url?: string | null
   purchased: boolean
 }
 
@@ -39,6 +41,8 @@ export function WishlistPage() {
   const [message, setMessage] = useState('')
   const [importing, setImporting] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -81,9 +85,18 @@ export function WishlistPage() {
     }
   }
 
-  async function onDelete(id: string) {
-    await api.delete(`/api/wishlist/${id}`)
-    await load()
+  async function confirmDelete() {
+    if (!deleteId) return
+    setDeleting(true)
+    try {
+      await api.delete(`/api/wishlist/${deleteId}`)
+      setDeleteId(null)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao excluir')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   async function togglePurchased(item: WishItem) {
@@ -91,7 +104,7 @@ export function WishlistPage() {
     await load()
   }
 
-  async function importFromNotion() {
+  async function importFromDump() {
     setImporting(true)
     setMessage('')
     setError('')
@@ -134,8 +147,8 @@ export function WishlistPage() {
           <h1 className="font-display text-2xl font-semibold tracking-tight">Wishlist</h1>
           <p className="text-muted-foreground">Itens desejados, progresso de economia e compras.</p>
         </div>
-        <Button variant="outline" type="button" disabled={importing} onClick={importFromNotion}>
-          {importing ? 'Importando…' : 'Importar do Notion (dump)'}
+        <Button variant="outline" type="button" disabled={importing} onClick={importFromDump}>
+          {importing ? 'Importando…' : 'Importar dump JSON'}
         </Button>
       </header>
 
@@ -224,7 +237,12 @@ export function WishlistPage() {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nenhum item na wishlist.</p>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <p className="text-sm text-muted-foreground">Nenhum item na wishlist.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Adicione um item ou importe um dump JSON.</p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {items.map((item) => {
@@ -234,16 +252,27 @@ export function WishlistPage() {
             return (
               <Card key={item.id}>
                 <CardContent className="space-y-3 pt-6">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="font-medium">{item.name}</h3>
-                      {item.category && (
-                        <Badge variant="muted" className="mt-1">
-                          {item.category}
-                        </Badge>
-                      )}
+                  <div className="flex gap-3">
+                    {item.image_url && (
+                      <img
+                        src={item.image_url}
+                        alt=""
+                        className="h-16 w-16 shrink-0 rounded-lg border border-border object-cover"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-medium">{item.name}</h3>
+                          {item.category && (
+                            <Badge variant="muted" className="mt-1">
+                              {item.category}
+                            </Badge>
+                          )}
+                        </div>
+                        {item.purchased && <Badge variant="success">Comprado</Badge>}
+                      </div>
                     </div>
-                    {item.purchased && <Badge variant="success">Comprado</Badge>}
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="font-mono tabular-nums">{formatBRL(saved)}</span>
@@ -261,13 +290,21 @@ export function WishlistPage() {
                       </Button>
                     )}
                     <Button variant="outline" size="sm" type="button" onClick={() => startEdit(item)}>
+                      <Pencil className="mr-1 h-3 w-3" />
                       Editar
                     </Button>
                     <Button variant="outline" size="sm" type="button" onClick={() => togglePurchased(item)}>
                       {item.purchased ? 'Desmarcar compra' : 'Marcar comprado'}
                     </Button>
-                    <Button variant="destructive" size="sm" type="button" onClick={() => onDelete(item.id)}>
-                      Excluir
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      type="button"
+                      aria-label="Excluir"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setDeleteId(item.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardContent>
@@ -276,6 +313,16 @@ export function WishlistPage() {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteId != null}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        title="Excluir item?"
+        description="Esta ação não pode ser desfeita."
+        confirmLabel="Excluir"
+        onConfirm={confirmDelete}
+        loading={deleting}
+      />
     </div>
   )
 }

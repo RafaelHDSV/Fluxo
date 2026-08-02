@@ -5,7 +5,7 @@ import { AuthProvider, useAuth } from '@/hooks/useAuth'
 import { AccountsPage } from '@/pages/AccountsPage'
 import { BudgetsPage } from '@/pages/BudgetsPage'
 import { DashboardPage } from '@/pages/DashboardPage'
-import { GoalsPage } from '@/pages/GoalsPage'
+import { InvestmentsPage } from '@/pages/InvestmentsPage'
 import { ImportsPage } from '@/pages/ImportsPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { PayablesPage } from '@/pages/PayablesPage'
@@ -51,7 +51,8 @@ export default function App() {
           <Route path="imports" element={<ImportsPage />} />
           <Route path="accounts" element={<AccountsPage />} />
           <Route path="budgets" element={<BudgetsPage />} />
-          <Route path="goals" element={<GoalsPage />} />
+          <Route path="investments" element={<InvestmentsPage />} />
+          <Route path="goals" element={<Navigate to="/investments" replace />} />
           <Route path="reports" element={<ReportsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

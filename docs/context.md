@@ -8,7 +8,7 @@
 
 ## Objetivo
 
-Fluxo é um controle financeiro pessoal web: entradas, saídas, contas, categorias, importação CSV/OFX, orçamentos, metas, wishlist, contas a pagar e dashboard analítico com Apache ECharts. Resolve a falta de clareza visual e o excesso de cadastro manual em planilhas.
+Fluxo é um controle financeiro pessoal web: entradas, saídas, contas, categorias, **importação mensal OFX (Santander)**, orçamentos por categoria, investimentos (caixinhas), wishlist, contas a pagar e dashboard/relatórios com Apache ECharts.
 
 ---
 
@@ -16,9 +16,9 @@ Fluxo é um controle financeiro pessoal web: entradas, saídas, contas, categori
 
 | Camada | Tecnologia / nota |
 |--------|-------------------|
-| Front | React 18, Vite, TypeScript, Tailwind CSS + shadcn/ui, SASS legado residual, React Router, ECharts |
+| Front | React 18, Vite, TypeScript, Tailwind + shadcn/ui, React Router, ECharts, Lucide |
 | Back | Node, Express 5 (BFF) |
-| Banco / Auth | PostgreSQL via Supabase (tabelas `fluxo_*`) + Auth + RLS |
+| Banco / Auth | PostgreSQL via Supabase (`fluxo_*`) + Auth + RLS |
 | Tooling | Yarn, Node 22+ |
 
 ---
@@ -34,13 +34,15 @@ Fluxo é um controle financeiro pessoal web: entradas, saídas, contas, categori
 
 ## Decisoes fixas
 
-1. Auth obrigatória no MVP (Supabase e-mail/senha)
-2. Express BFF + Supabase Postgres/Storage (não front-only)
-3. Moeda BRL; Open Finance fora do MVP (issue #10 em discussion)
+1. Auth obrigatória (Supabase e-mail/senha)
+2. Express BFF + Supabase Postgres
+3. Moeda BRL; **Open Finance fora** (custo de agregador)
 4. Gráficos: Apache ECharts
-5. Estilo v1.1: Tailwind + shadcn/ui com tema dark/light (tokens de `docs/DESIGN.md`); toggle no shell
-6. Wishlist em tabela dedicada `fluxo_wishlist` (não misturada com metas)
-7. Listagens de transações paginadas (`limit`/`offset` + total)
+5. Tailwind + shadcn com tema dark/light
+6. **Entrada de dados mensal:** OFX da conta Santander (Money 2000+); CSV/OFX genérico também
+7. Orçamentos = categorias + metas de gasto + regras de categorização (auto-sugestão na importação)
+8. Investimentos = ex-Metas (`fluxo_goals`) — caixinhas com progresso
+9. Notion foi carga inicial histórica; **não é fonte operacional**
 
 ---
 
@@ -49,20 +51,19 @@ Fluxo é um controle financeiro pessoal web: entradas, saídas, contas, categori
 | Tipo | URL |
 |------|-----|
 | Repositorio | https://github.com/RafaelHDSV/Fluxo |
-| Epic / board | https://github.com/RafaelHDSV/Fluxo/issues/1 |
-| Documentacao | `docs/especificacao.md`, `docs/DESIGN.md`, `docs/superpowers/` |
-| Gap Notion → Fluxo | `docs/superpowers/specs/2026-08-02-notion-fluxo-gap-analysis.md` |
-| Import Notion (P0–P2) | `docs/superpowers/specs/2026-08-02-notion-import-design.md` |
-| Proposta sub-issues | `.issues/2026-08-02-fluxo-sub-issues-v1.1.md` |
+| Epic | https://github.com/RafaelHDSV/Fluxo/issues/1 |
+| Specs | `docs/superpowers/specs/` |
+| Proposta v1.2 | `.issues/2026-08-02-fluxo-v1.2-ux-import.md` |
 
 ---
 
 ## Fora de escopo
 
-- Open Finance / Pluggy / Belvo (até decisão em #10)
-- Notion API nativa no BFF (dumps/CSV + scripts one-shot)
+- Open Finance / Pluggy / Belvo
+- Parser de PDF consolidado / fatura cartão automática (follow-up)
+- Notion API / sync contínuo
 - App mobile e multi-moeda
 
 ---
 
-*Atualizado em 2026-08-02 — entrega sub-issues #2–#9 e #11–#13.*
+*Atualizado em 2026-08-02 — v1.2 UX + OFX Santander.*

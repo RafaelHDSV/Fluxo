@@ -1,5 +1,8 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,7 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { currentMonthBounds, formatBRL, formatDate, todayISO } from '@/lib/format'
+import { formatBRL, formatDate, formatMonth, todayISO } from '@/lib/format'
+import { currentYearMonth, periodBounds, type PeriodMode } from '@/lib/period'
 import { labelOf, paymentMethodLabel, transactionTypeLabel } from '@/lib/labels'
 import { api } from '@/services/api'
 
@@ -59,9 +63,14 @@ const emptyForm = {
   payment_method: 'debit' as '' | 'debit' | 'credit',
 }
 
+function monthKey(date: string) {
+  return String(date).slice(0, 7)
+}
+
 export function TransactionsPage() {
   const [searchParams] = useSearchParams()
   const initialType = searchParams.get('type') || ''
+  const { year: defaultYear, month: defaultMonth } = currentYearMonth()
 
   const [items, setItems] = useState<Tx[]>([])
   const [total, setTotal] = useState(0)
@@ -72,10 +81,19 @@ export function TransactionsPage() {
   const [debouncedQ, setDebouncedQ] = useState('')
   const [type, setType] = useState(initialType)
   const [filterMode, setFilterMode] = useState<'all' | 'a_pagar'>('all')
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('all')
+  const [periodYear, setPeriodYear] = useState(defaultYear)
+  const [periodMonth, setPeriodMonth] = useState(defaultMonth)
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const isIncomeOnly = type === 'income'
+  const isExpenseForm = form.type === 'expense'
+  const showMeioColumn = !isIncomeOnly
 
   const categoryMap = useMemo(
     () => Object.fromEntries(categories.map((c) => [c.id, c.name])),
@@ -90,7 +108,7 @@ export function TransactionsPage() {
 
   useEffect(() => {
     setOffset(0)
-  }, [debouncedQ, type, filterMode])
+  }, [debouncedQ, type, filterMode, periodMode, periodYear, periodMonth])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -103,11 +121,16 @@ export function TransactionsPage() {
       if (filterMode === 'a_pagar') {
         params.set('type', 'expense')
         params.set('paid', 'false')
-        const { from, to } = currentMonthBounds()
-        params.set('from', from)
-        params.set('to', to)
-      } else if (type) {
-        params.set('type', type)
+        const { from, to } = periodBounds('month', periodYear, periodMonth)
+        if (from) params.set('from', from)
+        if (to) params.set('to', to)
+      } else {
+        if (type) params.set('type', type)
+        if (periodMode !== 'all') {
+          const { from, to } = periodBounds(periodMode, periodYear, periodMonth)
+          if (from) params.set('from', from)
+          if (to) params.set('to', to)
+        }
       }
       const qs = params.toString()
       const [txRes, accs, cats] = await Promise.all([
@@ -129,7 +152,7 @@ export function TransactionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [debouncedQ, type, filterMode, offset])
+  }, [debouncedQ, type, filterMode, offset, periodMode, periodYear, periodMonth])
 
   useEffect(() => {
     load()
@@ -155,7 +178,7 @@ export function TransactionsPage() {
         type: form.type,
         category_id: form.category_id,
         account_id: form.account_id,
-        paid: form.paid,
+        paid: form.type === 'income' ? true : form.paid,
         payment_method: form.type === 'expense' ? form.payment_method || null : null,
         transfer_account_id:
           form.type === 'transfer' && form.transfer_account_id ? form.transfer_account_id : null,
@@ -170,12 +193,22 @@ export function TransactionsPage() {
     }
   }
 
-  async function onDelete(id: string) {
-    await api.delete(`/api/transactions/${id}`)
-    await load()
+  async function confirmDelete() {
+    if (!deleteId) return
+    setDeleting(true)
+    try {
+      await api.delete(`/api/transactions/${deleteId}`)
+      setDeleteId(null)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao excluir')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   async function togglePaid(tx: Tx) {
+    if (tx.type !== 'expense') return
     await api.put(`/api/transactions/${tx.id}`, { paid: !tx.paid })
     await load()
   }
@@ -196,8 +229,24 @@ export function TransactionsPage() {
     })
   }
 
+  const groupedRows = useMemo(() => {
+    const groups: Array<{ key: string; label: string; items: Tx[] }> = []
+    let currentKey = ''
+    for (const tx of items) {
+      const key = monthKey(tx.date)
+      if (key !== currentKey) {
+        currentKey = key
+        groups.push({ key, label: formatMonth(key, 'long'), items: [tx] })
+      } else {
+        groups[groups.length - 1].items.push(tx)
+      }
+    }
+    return groups
+  }, [items])
+
   const page = Math.floor(offset / PAGE_SIZE) + 1
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const yearOptions = Array.from({ length: 5 }, (_, i) => defaultYear - 2 + i)
 
   return (
     <div className="space-y-6">
@@ -214,14 +263,8 @@ export function TransactionsPage() {
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="tx-date">Data</Label>
-                <Input
-                  id="tx-date"
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  required
-                />
+                <Label>Data</Label>
+                <DatePicker value={form.date} onChange={(date) => setForm({ ...form, date })} required />
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="tx-desc">Descrição</Label>
@@ -259,7 +302,7 @@ export function TransactionsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              {form.type === 'expense' && (
+              {isExpenseForm && (
                 <div className="space-y-2">
                   <Label>Meio de pagamento</Label>
                   <Select
@@ -345,16 +388,18 @@ export function TransactionsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-end gap-2 pb-2">
-                <Checkbox
-                  id="tx-paid"
-                  checked={form.paid}
-                  onCheckedChange={(c) => setForm({ ...form, paid: c === true })}
-                />
-                <Label htmlFor="tx-paid" className="cursor-pointer">
-                  Pago
-                </Label>
-              </div>
+              {isExpenseForm && (
+                <div className="flex items-end gap-2 pb-2">
+                  <Checkbox
+                    id="tx-paid"
+                    checked={form.paid}
+                    onCheckedChange={(c) => setForm({ ...form, paid: c === true })}
+                  />
+                  <Label htmlFor="tx-paid" className="cursor-pointer">
+                    Pago
+                  </Label>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="submit">{editingId ? 'Atualizar' : 'Adicionar'}</Button>
@@ -374,7 +419,7 @@ export function TransactionsPage() {
           <CardTitle className="text-base">Lançamentos</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
             <div className="space-y-2">
               <Label htmlFor="filter-q">Buscar</Label>
               <Input
@@ -412,6 +457,56 @@ export function TransactionsPage() {
                 </SelectContent>
               </Select>
             </div>
+            {filterMode === 'all' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Período</Label>
+                  <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as PeriodMode)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todo o histórico</SelectItem>
+                      <SelectItem value="month">Mês</SelectItem>
+                      <SelectItem value="year">Ano</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {periodMode !== 'all' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Ano</Label>
+                      <Select value={String(periodYear)} onValueChange={(v) => setPeriodYear(Number(v))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {yearOptions.map((y) => (
+                            <SelectItem key={y} value={String(y)}>
+                              {y}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {periodMode === 'month' && (
+                      <div className="space-y-2">
+                        <Label>Mês</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={12}
+                          value={periodMonth}
+                          onChange={(e) =>
+                            setPeriodMonth(Math.min(12, Math.max(1, Number(e.target.value) || 1)))
+                          }
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )}
           </div>
 
           {loading ? (
@@ -435,46 +530,82 @@ export function TransactionsPage() {
                       <TableHead>Categoria</TableHead>
                       <TableHead>Conta</TableHead>
                       <TableHead>Tipo</TableHead>
-                      <TableHead>Meio</TableHead>
-                      <TableHead>Pago</TableHead>
+                      {showMeioColumn && <TableHead>Meio</TableHead>}
+                      {!isIncomeOnly && <TableHead>Pago</TableHead>}
                       <TableHead className="text-right">Valor</TableHead>
-                      <TableHead />
+                      <TableHead className="w-[88px]" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {items.map((tx) => (
-                      <TableRow key={tx.id}>
-                        <TableCell>{formatDate(tx.date)}</TableCell>
-                        <TableCell>{tx.description}</TableCell>
-                        <TableCell>{categoryMap[tx.category_id] || '—'}</TableCell>
-                        <TableCell>{accountMap[tx.account_id] || '—'}</TableCell>
-                        <TableCell>
-                          <Badge variant="muted">{labelOf(transactionTypeLabel, tx.type)}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {tx.payment_method ? (
-                            <Badge variant="outline">{labelOf(paymentMethodLabel, tx.payment_method)}</Badge>
-                          ) : (
-                            '—'
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" type="button" onClick={() => togglePaid(tx)}>
-                            <Badge variant={tx.paid ? 'success' : 'warning'}>{tx.paid ? 'Sim' : 'Não'}</Badge>
-                          </Button>
-                        </TableCell>
-                        <TableCell className="text-right font-mono tabular-nums">{formatBRL(tx.amount)}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="sm" type="button" onClick={() => startEdit(tx)}>
-                              Editar
-                            </Button>
-                            <Button variant="destructive" size="sm" type="button" onClick={() => onDelete(tx.id)}>
-                              Excluir
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                    {groupedRows.map((group) => (
+                      <Fragment key={group.key}>
+                        <TableRow className="bg-muted/40 hover:bg-muted/40">
+                          <TableCell colSpan={showMeioColumn ? (isIncomeOnly ? 8 : 9) : isIncomeOnly ? 7 : 8}>
+                            <span className="text-sm font-semibold">{group.label}</span>
+                          </TableCell>
+                        </TableRow>
+                        {group.items.map((tx) => (
+                          <TableRow key={tx.id}>
+                            <TableCell>{formatDate(tx.date)}</TableCell>
+                            <TableCell>{tx.description}</TableCell>
+                            <TableCell>{categoryMap[tx.category_id] || '—'}</TableCell>
+                            <TableCell>{accountMap[tx.account_id] || '—'}</TableCell>
+                            <TableCell>
+                              <Badge variant="muted">{labelOf(transactionTypeLabel, tx.type)}</Badge>
+                            </TableCell>
+                            {showMeioColumn && (
+                              <TableCell>
+                                {tx.type === 'expense' && tx.payment_method ? (
+                                  <Badge variant="outline">
+                                    {labelOf(paymentMethodLabel, tx.payment_method)}
+                                  </Badge>
+                                ) : (
+                                  '—'
+                                )}
+                              </TableCell>
+                            )}
+                            {!isIncomeOnly && (
+                              <TableCell>
+                                {tx.type === 'expense' ? (
+                                  <Button variant="ghost" size="sm" type="button" onClick={() => togglePaid(tx)}>
+                                    <Badge variant={tx.paid ? 'success' : 'warning'}>
+                                      {tx.paid ? 'Sim' : 'Não'}
+                                    </Badge>
+                                  </Button>
+                                ) : (
+                                  '—'
+                                )}
+                              </TableCell>
+                            )}
+                            <TableCell className="text-right font-mono tabular-nums">
+                              {formatBRL(tx.amount)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  type="button"
+                                  aria-label="Editar"
+                                  onClick={() => startEdit(tx)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  type="button"
+                                  aria-label="Excluir"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => setDeleteId(tx.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </Fragment>
                     ))}
                   </TableBody>
                 </Table>
@@ -508,6 +639,16 @@ export function TransactionsPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={deleteId != null}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        title="Excluir lançamento?"
+        description="Esta ação não pode ser desfeita."
+        confirmLabel="Excluir"
+        onConfirm={confirmDelete}
+        loading={deleting}
+      />
     </div>
   )
 }
