@@ -131,6 +131,32 @@ router.get('/', async (req, res) => {
   res.json({ items: rows, total, limit, offset })
 })
 
+/** Descrições distintas para autocomplete (por frequência e recência). */
+router.get('/descriptions', async (req, res) => {
+  const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''
+  const limitRaw = typeof req.query.limit === 'string' ? Number(req.query.limit) : 12
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(Math.trunc(limitRaw), 1), 40) : 12
+  const params: unknown[] = [req.userId]
+  let filter = ''
+  if (q) {
+    params.push(`%${q}%`)
+    filter = ` and description ilike $${params.length}`
+  }
+  params.push(limit)
+  const rows = await query<{ description: string; uses: number; category_id: string | null }>(
+    `select description,
+       count(*)::int as uses,
+       (array_agg(category_id order by date desc nulls last, created_at desc))[1] as category_id
+     from ${T.transactions}
+     where user_id = $1${filter}
+     group by description
+     order by uses desc, max(date) desc nulls last
+     limit $${params.length}`,
+    params,
+  )
+  res.json({ items: rows })
+})
+
 router.post('/', async (req, res) => {
   const body = req.body ?? {}
   const {

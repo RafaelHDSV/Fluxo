@@ -2,6 +2,7 @@ import { Fragment, FormEvent, useCallback, useEffect, useMemo, useRef, useState 
 import { Pencil, Trash2 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { DescriptionAutocomplete } from '@/components/DescriptionAutocomplete'
 import { TruncatedText } from '@/components/TruncatedText'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Badge } from '@/components/ui/badge'
@@ -441,10 +442,17 @@ export function TransactionsPage() {
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="tx-desc">Descrição</Label>
-                <Input
+                <DescriptionAutocomplete
                   id="tx-desc"
                   value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  onChange={(description) => setForm((f) => ({ ...f, description }))}
+                  onSelect={(item) =>
+                    setForm((f) => ({
+                      ...f,
+                      description: item.description,
+                      category_id: item.category_id || f.category_id,
+                    }))
+                  }
                   required
                 />
               </div>
