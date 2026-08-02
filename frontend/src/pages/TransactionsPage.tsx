@@ -156,7 +156,7 @@ export function TransactionsPage() {
 
   useEffect(() => {
     setSelectedIds(new Set())
-  }, [debouncedQ, type, filterMode, periodMode, periodYear, periodMonth, offset])
+  }, [debouncedQ, type, filterMode, periodMode, periodYear, periodMonth])
 
   // Persiste filtros na URL
   useEffect(() => {
@@ -695,7 +695,15 @@ export function TransactionsPage() {
                           </TableCell>
                         </TableRow>
                         {group.items.map((tx) => (
-                          <TableRow key={tx.id} data-state={selectedIds.has(tx.id) ? 'selected' : undefined}>
+                          <TableRow
+                            key={tx.id}
+                            data-state={selectedIds.has(tx.id) ? 'selected' : undefined}
+                            className={cn(
+                              selectedIds.has(tx.id)
+                                ? 'border-l-4 border-l-primary bg-primary/10 hover:bg-primary/15'
+                                : 'border-l-4 border-l-transparent',
+                            )}
+                          >
                             <TableCell>
                               <Checkbox
                                 checked={selectedIds.has(tx.id)}
