@@ -138,9 +138,12 @@ export function TransactionsPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
   const formCardRef = useRef<HTMLDivElement>(null)
   const skipUrlWrite = useRef(true)
   const skipOffsetReset = useRef(true)
+  const selectionAnchorRef = useRef<number | null>(null)
+  const shiftClickRef = useRef(false)
 
   const isIncomeOnly = type === 'income'
   const isExpenseForm = form.type === 'expense'
@@ -177,6 +180,7 @@ export function TransactionsPage() {
 
   useEffect(() => {
     setSelectedIds(new Set())
+    selectionAnchorRef.current = null
   }, [debouncedQ, type, filterMode, periodMode, periodYear, periodMonth])
 
   // Persiste filtros na URL
@@ -356,12 +360,26 @@ export function TransactionsPage() {
   }
 
   function toggleSelect(id: string, checked: boolean) {
+    const index = pageIds.indexOf(id)
+    if (shiftClickRef.current && selectionAnchorRef.current != null && index >= 0) {
+      const from = Math.min(selectionAnchorRef.current, index)
+      const to = Math.max(selectionAnchorRef.current, index)
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        for (let i = from; i <= to; i++) next.add(pageIds[i])
+        return next
+      })
+      shiftClickRef.current = false
+      return
+    }
+    shiftClickRef.current = false
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (checked) next.add(id)
       else next.delete(id)
       return next
     })
+    if (index >= 0) selectionAnchorRef.current = index
   }
 
   function toggleSelectAllPage(checked: boolean) {
@@ -373,12 +391,30 @@ export function TransactionsPage() {
       }
       return next
     })
+    selectionAnchorRef.current = checked && pageIds.length > 0 ? 0 : null
   }
 
   async function togglePaid(tx: Tx) {
     if (tx.type !== 'expense') return
     await api.put(`/api/transactions/${tx.id}`, { paid: !tx.paid })
     await load()
+  }
+
+  async function bulkSetPaid(paid: boolean) {
+    if (selectedIds.size === 0) return
+    setBulkBusy(true)
+    setError('')
+    try {
+      await api.post<{ updated: number }>('/api/transactions/bulk-paid', {
+        ids: Array.from(selectedIds),
+        paid,
+      })
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao atualizar pagamento')
+    } finally {
+      setBulkBusy(false)
+    }
   }
 
   function startEdit(tx: Tx) {
@@ -763,13 +799,40 @@ export function TransactionsPage() {
                 {selectedIds.size} selecionada{selectedIds.size === 1 ? '' : 's'}
               </span>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setSelectedIds(new Set())}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={bulkBusy}
+                  onClick={() => void bulkSetPaid(true)}
+                >
+                  Marcar pago
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={bulkBusy}
+                  onClick={() => void bulkSetPaid(false)}
+                >
+                  Marcar não pago
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedIds(new Set())
+                    selectionAnchorRef.current = null
+                  }}
+                >
                   Limpar seleção
                 </Button>
                 <Button
                   type="button"
                   variant="destructive"
                   size="sm"
+                  disabled={bulkBusy}
                   onClick={() => setBulkDeleteOpen(true)}
                 >
                   Excluir selecionadas
@@ -833,6 +896,9 @@ export function TransactionsPage() {
                             <TableCell>
                               <Checkbox
                                 checked={selectedIds.has(tx.id)}
+                                onPointerDown={(e) => {
+                                  shiftClickRef.current = e.shiftKey
+                                }}
                                 onCheckedChange={(c) => toggleSelect(tx.id, c === true)}
                                 aria-label={`Selecionar ${tx.description}`}
                               />

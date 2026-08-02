@@ -412,4 +412,27 @@ router.post('/bulk-delete', async (req, res) => {
   res.json({ deleted: deleted.length })
 })
 
+router.post('/bulk-paid', async (req, res) => {
+  const ids = req.body?.ids
+  const paid = parsePaid(req.body?.paid)
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids obrigatório' })
+  }
+  if (paid === null) {
+    return res.status(400).json({ error: 'paid obrigatório (true|false)' })
+  }
+  const cleaned = ids.filter((id: unknown) => typeof id === 'string' && id.length > 0)
+  if (cleaned.length === 0) {
+    return res.status(400).json({ error: 'ids inválidos' })
+  }
+  const updated = await query<{ id: string }>(
+    `update ${T.transactions}
+     set paid = $3, updated_at = now()
+     where user_id = $1 and id = any($2::uuid[]) and type = 'expense'
+     returning id`,
+    [req.userId, cleaned, paid],
+  )
+  res.json({ updated: updated.length })
+})
+
 export default router
