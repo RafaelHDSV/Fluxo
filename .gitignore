@@ -20,9 +20,11 @@ node_modules
 dist
 dist-ssr
 
-# allow vendor SDK dist
+# allow vendor SDK dist (root + frontend copy)
 !vendor/vieira-analytics/dist/
 !vendor/vieira-analytics/dist/**
+!frontend/vendor/vieira-analytics/dist/
+!frontend/vendor/vieira-analytics/dist/**
 *.local
 
 # Editor directories and files
