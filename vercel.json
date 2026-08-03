@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "installCommand": "yarn --cwd backend install && yarn --cwd frontend install",
+  "installCommand": "yarn --cwd backend install && rm -rf frontend/node_modules/@vieira && yarn --cwd frontend install --check-files",
   "buildCommand": "yarn --cwd frontend build",
   "outputDirectory": "frontend/dist",
   "functions": {
