@@ -1,27 +1,38 @@
 # Código de Conduta
 
-## Nosso Compromisso
+## Nosso compromisso
 
-Comprometemo-nos a tornar a participação em nosso projeto uma experiência livre de assédio para todos.
+Comprometemo-nos a tornar a participação neste projeto uma experiência **livre de assédio** para todas as pessoas, independentemente de idade, corpo, deficiência visível ou invisível, etnia, características sexuais, identidade ou expressão de gênero, nível de experiência, educação, status socioeconômico, nacionalidade, aparência, raça, religião ou orientação sexual.
 
-## Nossos Padrões
+## Nossos padrões
 
-Exemplos de comportamentos que contribuem para um ambiente positivo incluem:
+Comportamentos que contribuem para um ambiente positivo:
+
 - Ser respeitoso e inclusivo
-- Aceitar críticas construtivas
-- Focar no que é melhor para a comunidade
+- Aceitar críticas construtivas de boa fé
+- Focar no que é melhor para a comunidade e para o produto
 - Demonstrar empatia pelos outros participantes
+- Usar linguagem acolhedora e profissional
 
-Comportamentos inaceitáveis ​​incluem:
-- Assédio
-- Comentários ofensivos
-- Ataques pessoais
+Comportamentos inaceitáveis:
+
+- Assédio, perseguição ou intimidação
+- Comentários ofensivos, pejorativos ou sexualizados
+- Ataques pessoais ou políticos
 - Discriminação de qualquer tipo
+- Publicar informação privada de outras pessoas sem permissão
+- Outras condutas que razoavelmente se considerariam inapropriadas em um ambiente profissional
 
 ## Aplicação
 
-Os mantenedores do projeto são responsáveis ​​por esclarecer os padrões e podem remover ou editar contribuições que violem este código.
+Os mantenedores do projeto são responsáveis por esclarecer e aplicar estes padrões. Podem remover, editar ou rejeitar comentários, commits, código, issues, PRs e outras contribuições que violem este código, e comunicar as razões quando apropriado.
 
 ## Denúncia
 
-Se você vivenciar ou presenciar um comportamento inaceitável, denuncie-o aos mantenedores do projeto.
+Se você vivenciar ou presenciar um comportamento inaceitável, denuncie em privado ao mantenedor (veja [SECURITY.md](./SECURITY.md) para o canal preferencial de contato sensível, ou use DM/e-mail privado).
+
+Todas as denúncias serão analisadas e respondidas de forma justa e, na medida do possível, confidencial.
+
+## Atribuição
+
+Adaptado do [Contributor Covenant](https://www.contributor-covenant.org/), versão 2.1, para o contexto do projeto Fluxo.
