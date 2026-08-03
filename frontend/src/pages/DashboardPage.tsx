@@ -108,7 +108,7 @@ export function DashboardPage() {
           <div className="space-y-1">
             <Label className="text-xs">Período</Label>
             <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as PeriodMode)}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-full sm:w-[140px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -122,7 +122,7 @@ export function DashboardPage() {
             <div className="space-y-1">
               <Label className="text-xs">Ano</Label>
               <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-                <SelectTrigger className="w-[100px]">
+                <SelectTrigger className="w-full sm:w-[100px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -142,7 +142,7 @@ export function DashboardPage() {
                 type="number"
                 min={1}
                 max={12}
-                className="w-[72px]"
+                className="w-full sm:w-[72px]"
                 value={month}
                 onChange={(e) => setMonth(Math.min(12, Math.max(1, Number(e.target.value) || 1)))}
               />
