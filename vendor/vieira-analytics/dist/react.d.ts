@@ -1,3 +1,7 @@
-import type { JSX } from 'react'
+interface VieiraAnalyticsProps {
+    projectKey: string;
+    respectDnt?: boolean;
+}
+declare function VieiraAnalytics(props: VieiraAnalyticsProps): null;
 
-export declare function VieiraAnalytics(props: { projectKey: string }): JSX.Element | null
+export { VieiraAnalytics, type VieiraAnalyticsProps };
