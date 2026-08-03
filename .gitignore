@@ -1,5 +1,6 @@
 .env
 
+ofx
 ofx/*
 
 # Notion one-shot dump (PII / histórico pessoal)
@@ -39,10 +40,18 @@ versions/*
 out/*
 
 # Issues
+.issues
 .issues/*
 
 # AI Tools
+.ai
 .ai/*
+
+.claude
 .claude/*
+
+.cursor
 .cursor/*
+
+.opencode
 .opencode/*
