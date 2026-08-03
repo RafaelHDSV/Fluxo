@@ -1,10 +1,20 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "installCommand": "yarn --cwd frontend install",
+  "installCommand": "yarn --cwd backend install && yarn --cwd frontend install",
   "buildCommand": "yarn --cwd frontend build",
   "outputDirectory": "frontend/dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 30,
+      "memory": 1024
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/health", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",

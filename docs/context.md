@@ -19,7 +19,7 @@ Tagline: *Veja seu dinheiro com clareza.*
 | Camada | Tecnologia / nota |
 |--------|-------------------|
 | Front | React 18, Vite, TypeScript, Tailwind + shadcn/ui, React Router, ECharts, Lucide |
-| Back | Node, Express 5 (BFF) |
+| Back | Node, Express 5 (BFF; na Vercel vira Serverless Function em `/api`) |
 | Banco / Auth | PostgreSQL via Supabase (`fluxo_*`) + Auth + RLS |
 | Tooling | Yarn workspaces-style (`yarn` na raiz), Node 22+ |
 
@@ -105,7 +105,7 @@ Dashboard · Transações · A pagar · Importações · Contas · Orçamentos �
 | Proposta v1.2 | `.issues/2026-08-02-fluxo-v1.2-ux-import.md` |
 | Design visual | `docs/DESIGN.md` |
 | Especificação | `docs/especificacao.md` |
-| Deploy front | `vercel.json` (raiz) — SPA Vite; BFF fora da Vercel |
+| Deploy | `vercel.json` + `api/index.ts` — front SPA + BFF serverless no mesmo app |
 
 ---
 

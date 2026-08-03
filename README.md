@@ -96,7 +96,7 @@ Preencha com os dados do seu projeto Supabase:
 |----------|------|-----|
 | `VITE_SUPABASE_URL` | frontend | URL do projeto |
 | `VITE_SUPABASE_ANON_KEY` | frontend | Chave anônima (cliente) |
-| `VITE_BACKEND_URL` | frontend | URL do BFF (`http://localhost:3693` em local) |
+| `VITE_BACKEND_URL` | frontend | Local: `http://localhost:3693`. Produção (Vercel): **vazio** (same-origin) |
 | `SUPABASE_URL` / JWT / `DATABASE_URL` | backend | Conforme o `.env.example` do back |
 
 Nunca commite arquivos `.env` com valores reais.
@@ -128,24 +128,27 @@ cd backend && yarn build
 
 ---
 
-## Deploy
+## Deploy (Vercel — app único)
 
-### Frontend (Vercel)
+Um único projeto na Vercel serve o **frontend (SPA)** e o **BFF Express** como Serverless Function (`/api/*`).
 
-O `vercel.json` na raiz configura o build do Vite em `frontend/` e o rewrite de SPA.
+1. Importe o repositório (Root Directory = raiz).
+2. Configure as variáveis de ambiente:
 
-1. Importe o repositório na Vercel (raiz do repo).
-2. Configure:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-   - `VITE_BACKEND_URL` — URL **pública** do BFF
+| Variável | Obrigatória | Notas |
+|----------|-------------|--------|
+| `VITE_SUPABASE_URL` | sim | Build do front |
+| `VITE_SUPABASE_ANON_KEY` | sim | Build do front |
+| `VITE_BACKEND_URL` | não | **Deixe vazio** em produção (same-origin) |
+| `DATABASE_URL` | sim | Runtime da function |
+| `SUPABASE_URL` | sim | Runtime (Auth/JWKS) |
+| `SUPABASE_ANON_KEY` | sim | Runtime |
+| `SUPABASE_JWT_SECRET` | recomendado | Validação JWT |
+| `CORS_ORIGIN` | opcional | Em prod same-origin quase não importa; local usa `http://localhost:3333` |
+
 3. Publique.
 
-Se preferir, use Root Directory = `frontend` (há um `vercel.json` equivalente nessa pasta).
-
-### Backend (BFF)
-
-A Vercel hospeda só o front. Hospede o Express em outro serviço (Railway, Fly.io, VPS, etc.), com as variáveis do `backend/.env.example`, e aponte `VITE_BACKEND_URL` para essa URL. Libere CORS para o domínio do front.
+Local continua com `yarn dev` (front :3333 + API :3693). Em produção o front chama `/api/...` no mesmo domínio.
 
 ---
 

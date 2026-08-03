@@ -1,6 +1,13 @@
 import { supabase } from '../lib/supabase'
 
-const BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3693'
+/** Local: BFF na 3693. Produção (Vercel): same-origin — deixe VITE_BACKEND_URL vazio. */
+const BASE =
+  import.meta.env.VITE_BACKEND_URL !== undefined && import.meta.env.VITE_BACKEND_URL !== ''
+    ? import.meta.env.VITE_BACKEND_URL
+    : import.meta.env.DEV
+      ? 'http://localhost:3693'
+      : ''
+
 
 async function authHeaders() {
   const { data } = await supabase.auth.getSession()
