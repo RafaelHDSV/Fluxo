@@ -1,17 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Fluxo">
   <rect width="64" height="64" rx="16" fill="#0F1419"/>
   <path
-    d="M16 44c10-20 16-24 24-24 5.5 0 9.5 2.5 14 8"
-    stroke="#3DDC97"
-    stroke-width="3.5"
-    stroke-linecap="round"
+    fill="#3DDC97"
+    d="M19 15h8v34h-8V15zm8 0h14v8H27V15zm14 0 14 4-14 4V15zM27 29h13v8H27v-8z"
   />
-  <path
-    d="M44 22l10 0 0 10"
-    stroke="#3DDC97"
-    stroke-width="3.5"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  />
-  <circle cx="20" cy="44" r="2.5" fill="#5B8DEF"/>
 </svg>
