@@ -6,6 +6,8 @@ type Props = {
   monthly: Array<{ month: string; income: string | number; expense: string | number }>
   byCategory: Array<{ name: string; color?: string; total: string | number }>
   cashflow: Array<{ date: string; result: string | number }>
+  /** Saldo do mês anterior — entra na 1ª barra de receitas (igual ao card Receitas). */
+  openingBalance?: number
   loading?: boolean
 }
 
@@ -18,7 +20,13 @@ function EmptyChart({ title, message }: { title: string; message: string }) {
   )
 }
 
-export function DashboardCharts({ monthly, byCategory, cashflow, loading }: Props) {
+export function DashboardCharts({
+  monthly,
+  byCategory,
+  cashflow,
+  openingBalance = 0,
+  loading,
+}: Props) {
   if (loading) {
     return (
       <div className="grid gap-6 lg:grid-cols-2">
@@ -29,7 +37,17 @@ export function DashboardCharts({ monthly, byCategory, cashflow, loading }: Prop
     )
   }
 
-  const hasMonthly = monthly.some((m) => Number(m.income) > 0 || Number(m.expense) > 0)
+  const carryIn = Number.isFinite(openingBalance) ? openingBalance : 0
+  const chartMonthly =
+    monthly.length === 0 && carryIn > 0
+      ? [{ month: new Date().toISOString().slice(0, 7), income: carryIn, expense: 0 }]
+      : monthly.map((m, i) =>
+          i === 0 && carryIn !== 0
+            ? { ...m, income: Number(m.income) + carryIn }
+            : { ...m, income: Number(m.income), expense: Number(m.expense) },
+        )
+
+  const hasMonthly = chartMonthly.some((m) => Number(m.income) > 0 || Number(m.expense) > 0)
   const hasCategory = byCategory.some((c) => Number(c.total) > 0)
   const hasCashflow = cashflow.length > 0
 
@@ -47,7 +65,7 @@ export function DashboardCharts({ monthly, byCategory, cashflow, loading }: Prop
       textStyle: { color: '#8b9aab' },
     },
     grid: { left: 48, right: 16, top: 56, bottom: 30 },
-    xAxis: { type: 'category', data: monthly.map((m) => formatMonth(m.month)) },
+    xAxis: { type: 'category', data: chartMonthly.map((m) => formatMonth(m.month)) },
     yAxis: {
       type: 'value',
       axisLabel: { formatter: (v: number) => formatBRL(v).replace(/\s/g, '\u00a0') },
@@ -56,13 +74,13 @@ export function DashboardCharts({ monthly, byCategory, cashflow, loading }: Prop
       {
         name: 'Receitas',
         type: 'bar',
-        data: monthly.map((m) => Number(m.income)),
+        data: chartMonthly.map((m) => Number(m.income)),
         itemStyle: { color: '#3ddc97', borderRadius: [6, 6, 0, 0] },
       },
       {
         name: 'Despesas',
         type: 'bar',
-        data: monthly.map((m) => Number(m.expense)),
+        data: chartMonthly.map((m) => Number(m.expense)),
         itemStyle: { color: '#f07178', borderRadius: [6, 6, 0, 0] },
       },
     ],

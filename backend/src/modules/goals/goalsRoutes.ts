@@ -13,13 +13,14 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const { name, target_amount, current_amount = 0, deadline, account_id } = req.body ?? {}
-  if (!name || target_amount == null) {
-    return res.status(400).json({ error: 'name e target_amount são obrigatórios' })
+  if (!name) {
+    return res.status(400).json({ error: 'name é obrigatório' })
   }
+  const target = target_amount == null || target_amount === '' ? 0 : target_amount
   const row = await queryOne(
     `insert into ${T.goals} (user_id, name, target_amount, current_amount, deadline, account_id)
      values ($1,$2,$3,$4,$5,$6) returning *`,
-    [req.userId, name, target_amount, current_amount, deadline ?? null, account_id ?? null],
+    [req.userId, name, target, current_amount, deadline ?? null, account_id ?? null],
   )
   res.status(201).json(row)
 })

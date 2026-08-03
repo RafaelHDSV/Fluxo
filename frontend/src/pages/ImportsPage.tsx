@@ -21,7 +21,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatBRL, formatDate } from '@/lib/format'
 import { labelOf, matchTypeLabel, transactionTypeLabel } from '@/lib/labels'
 import { api } from '@/services/api'
@@ -48,15 +47,7 @@ type ImportRow = {
   suggested_category_id?: string | null
 }
 
-const SANTANDER_STEPS = [
-  'Acesse o Internet Banking do Santander',
-  'Vá em Conta corrente → Extrato',
-  'Exporte no formato Money 2000 ou superior (.OFX)',
-  'Envie o arquivo abaixo na conta de destino correta',
-]
-
 export function ImportsPage() {
-  const [tab, setTab] = useState('importar')
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [categoryRules, setCategoryRules] = useState<CategoryRule[]>([])
@@ -281,26 +272,7 @@ export function ImportsPage() {
         </p>
       </header>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="importar">Importar</TabsTrigger>
-          <TabsTrigger value="regras">Regras</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="importar" className="space-y-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Como exportar do Santander</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
-                {SANTANDER_STEPS.map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
-            </CardContent>
-          </Card>
-
+      <div className="space-y-6">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
@@ -309,11 +281,11 @@ export function ImportsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={onPreview} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <form onSubmit={onPreview} className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
                   <Label>Conta destino</Label>
                   <Select value={accountId} onValueChange={setAccountId}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -336,7 +308,7 @@ export function ImportsPage() {
                   />
                 </div>
                 <div className="flex items-end">
-                  <Button type="submit" disabled={pending}>
+                  <Button type="submit" className="h-10" disabled={pending}>
                     {pending ? 'Processando…' : 'Pré-visualizar'}
                   </Button>
                 </div>
@@ -529,9 +501,7 @@ export function ImportsPage() {
               </CardContent>
             </Card>
           )}
-        </TabsContent>
 
-        <TabsContent value="regras" className="space-y-6">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Regras de nome</CardTitle>
@@ -540,7 +510,10 @@ export function ImportsPage() {
               <p className="text-sm text-muted-foreground">
                 Se a descrição do extrato contém um texto, ela vira um nome amigável no preview.
               </p>
-              <form onSubmit={createDescriptionRule} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <form
+                onSubmit={createDescriptionRule}
+                className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-3"
+              >
                 <div className="space-y-2">
                   <Label htmlFor="desc-pat">Se contém</Label>
                   <Input
@@ -562,7 +535,9 @@ export function ImportsPage() {
                   />
                 </div>
                 <div className="flex items-end">
-                  <Button type="submit">Criar regra de nome</Button>
+                  <Button type="submit" className="h-10">
+                    Criar regra de nome
+                  </Button>
                 </div>
               </form>
               {descriptionRules.length === 0 ? (
@@ -602,14 +577,17 @@ export function ImportsPage() {
               <p className="text-sm text-muted-foreground">
                 Se a descrição (já renomeada) contém um texto, sugere a categoria na importação.
               </p>
-              <form onSubmit={createCategoryRule} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <form
+                onSubmit={createCategoryRule}
+                className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-4"
+              >
                 <div className="space-y-2">
                   <Label>Categoria</Label>
                   <Select
                     value={catRuleForm.category_id}
                     onValueChange={(v) => setCatRuleForm({ ...catRuleForm, category_id: v })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -627,7 +605,7 @@ export function ImportsPage() {
                     value={catRuleForm.match_type}
                     onValueChange={(v) => setCatRuleForm({ ...catRuleForm, match_type: v })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -650,7 +628,9 @@ export function ImportsPage() {
                   />
                 </div>
                 <div className="flex items-end">
-                  <Button type="submit">Criar regra</Button>
+                  <Button type="submit" className="h-10">
+                    Criar regra
+                  </Button>
                 </div>
               </form>
               {categoryRules.length === 0 ? (
@@ -685,8 +665,7 @@ export function ImportsPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+      </div>
 
       <ConfirmDialog
         open={deleteCatRuleId != null}

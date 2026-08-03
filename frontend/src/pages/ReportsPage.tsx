@@ -1,8 +1,7 @@
 import { CalendarDays, FileBarChart, Filter } from 'lucide-react'
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -68,6 +67,7 @@ export function ReportsPage() {
     tag: '',
   })
   const [summary, setSummary] = useState<Summary | null>(null)
+  const [openingBalance, setOpeningBalance] = useState(0)
   const [calendarYear, setCalendarYear] = useState(currentYear)
   const [calendar, setCalendar] = useState<CalendarReport | null>(null)
   const [loadingCalendar, setLoadingCalendar] = useState(true)
@@ -106,8 +106,7 @@ export function ReportsPage() {
     }))
   }, [periodMode, periodYear, periodMonth])
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault()
+  const loadSummary = useCallback(async () => {
     setLoadingSummary(true)
     setError('')
     const params = new URLSearchParams()
@@ -117,13 +116,44 @@ export function ReportsPage() {
     if (filters.category_id) params.set('category_id', filters.category_id)
     if (filters.tag) params.set('tag', filters.tag)
     try {
-      setSummary(await api.get<Summary>(`/api/reports/summary?${params}`))
+      const summaryRes = await api.get<Summary>(`/api/reports/summary?${params}`)
+      setSummary(summaryRes)
+
+      // Sem filtros extras e com datas do atalho: mesmo saldo de abertura do dashboard
+      const bounds = periodBounds(periodMode, periodYear, periodMonth)
+      const matchesPeriodShortcut =
+        periodMode !== 'all' &&
+        filters.from === (bounds.from ?? filters.from) &&
+        filters.to === (bounds.to ?? filters.to)
+      const noExtraFilters = !filters.account_id && !filters.category_id && !filters.tag
+      if (noExtraFilters && matchesPeriodShortcut) {
+        const dashParams = new URLSearchParams({ period: periodMode, year: String(periodYear) })
+        if (periodMode === 'month') dashParams.set('month', String(periodMonth))
+        const dash = await api.get<{ openingBalance?: number | null }>(
+          `/api/reports/dashboard?${dashParams}`,
+        )
+        setOpeningBalance(
+          dash.openingBalance != null && Number.isFinite(dash.openingBalance) ? dash.openingBalance : 0,
+        )
+      } else {
+        setOpeningBalance(0)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro')
     } finally {
       setLoadingSummary(false)
     }
-  }
+  }, [filters, periodMode, periodYear, periodMonth])
+
+  useEffect(() => {
+    void loadSummary()
+  }, [loadSummary])
+
+  const receitasTotais = summary
+    ? Number(summary.totals.income) + (periodMode === 'all' ? 0 : openingBalance)
+    : 0
+  const despesasTotais = summary ? Number(summary.totals.expense) : 0
+  const saldoMes = receitasTotais - despesasTotais
 
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
 
@@ -244,12 +274,12 @@ export function ReportsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={onSubmit} className="space-y-4">
+          <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-2">
                 <Label>Período rápido</Label>
                 <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as PeriodMode)}>
-                  <SelectTrigger className="w-[160px]">
+                  <SelectTrigger className="h-10 w-[160px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -263,7 +293,7 @@ export function ReportsPage() {
                 <div className="space-y-2">
                   <Label>Ano</Label>
                   <Select value={String(periodYear)} onValueChange={(v) => setPeriodYear(Number(v))}>
-                    <SelectTrigger className="w-[100px]">
+                    <SelectTrigger className="h-10 w-[100px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -283,7 +313,7 @@ export function ReportsPage() {
                     type="number"
                     min={1}
                     max={12}
-                    className="w-[72px]"
+                    className="h-10 w-[72px]"
                     value={periodMonth}
                     onChange={(e) =>
                       setPeriodMonth(Math.min(12, Math.max(1, Number(e.target.value) || 1)))
@@ -292,9 +322,10 @@ export function ReportsPage() {
                 </div>
               )}
               <p className="pb-2 text-sm text-muted-foreground">{periodLabel}</p>
+              {loadingSummary && <p className="pb-2 text-sm text-muted-foreground">Atualizando…</p>}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <div className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               <div className="space-y-2">
                 <Label>De</Label>
                 <DatePicker value={filters.from} onChange={(from) => setFilters({ ...filters, from })} />
@@ -309,7 +340,7 @@ export function ReportsPage() {
                   value={filters.account_id || 'all'}
                   onValueChange={(v) => setFilters({ ...filters, account_id: v === 'all' ? '' : v })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -328,7 +359,7 @@ export function ReportsPage() {
                   value={filters.category_id || 'all'}
                   onValueChange={(v) => setFilters({ ...filters, category_id: v === 'all' ? '' : v })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -350,28 +381,25 @@ export function ReportsPage() {
                   placeholder="opcional"
                 />
               </div>
-              <div className="flex items-end">
-                <Button type="submit" disabled={loadingSummary}>
-                  {loadingSummary ? 'Gerando…' : 'Gerar relatório'}
-                </Button>
-              </div>
             </div>
-          </form>
+          </div>
         </CardContent>
       </Card>
 
       {summary && (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardContent className="pt-6">
                 <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <FileBarChart className="h-3.5 w-3.5" />
                   Receitas
                 </p>
-                <p className="font-mono text-xl tabular-nums text-primary">{formatBRL(summary.totals.income)}</p>
+                <p className="font-mono text-xl tabular-nums text-primary">{formatBRL(receitasTotais)}</p>
                 <p className="text-xs text-muted-foreground">
-                  {formatDate(summary.period.from)} — {formatDate(summary.period.to)}
+                  {openingBalance > 0
+                    ? `inclui ${formatBRL(openingBalance)} do mês anterior`
+                    : `${formatDate(summary.period.from)} — ${formatDate(summary.period.to)}`}
                 </p>
               </CardContent>
             </Card>
@@ -379,8 +407,14 @@ export function ReportsPage() {
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">Despesas</p>
                 <p className="font-mono text-xl tabular-nums text-destructive">
-                  {formatBRL(summary.totals.expense)}
+                  {formatBRL(despesasTotais)}
                 </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Saldo do período</p>
+                <p className="font-mono text-xl tabular-nums">{formatBRL(saldoMes)}</p>
               </CardContent>
             </Card>
             <Card>
@@ -465,16 +499,7 @@ export function ReportsPage() {
         </>
       )}
 
-      {!summary && !loadingSummary && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <FileBarChart className="mb-3 h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              Selecione um período e clique em &quot;Gerar relatório&quot; para ver o resumo.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      {!summary && loadingSummary && <Skeleton className="h-40 w-full" />}
     </div>
   )
 }

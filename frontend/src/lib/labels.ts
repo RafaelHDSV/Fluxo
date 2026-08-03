@@ -1,8 +1,13 @@
 export const accountTypeLabel: Record<string, string> = {
   checking: 'Conta corrente',
+  credit_card: 'Cartão de crédito',
+}
+
+/** Tipos ainda aceitos na API/legado, só para exibição de contas antigas. */
+export const accountTypeLabelAll: Record<string, string> = {
+  ...accountTypeLabel,
   wallet: 'Carteira',
   investment: 'Investimento',
-  credit_card: 'Cartão de crédito',
   external: 'Externa',
 }
 

@@ -260,6 +260,7 @@ export function DashboardPage() {
                 monthly={data.monthly || []}
                 byCategory={data.byCategory || []}
                 cashflow={cashflow}
+                openingBalance={showCarryIn ? carryIn : 0}
                 loading={loading}
               />
             </CardContent>

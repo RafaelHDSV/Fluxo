@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { CategoryIcon, categoryEmojiOptions } from '@/lib/categoryIcons'
 import { formatBRL, todayISO } from '@/lib/format'
 import { currentYearMonth, periodBounds } from '@/lib/period'
 import { api } from '@/services/api'
@@ -49,6 +50,8 @@ type Summary = {
   byCategory: Array<{ name: string; type: string; total: string | number }>
 }
 
+type ApiStatRow = Record<string, unknown>
+
 function expenseMap(summary: Summary) {
   const map = new Map<string, number>()
   for (const row of summary.byCategory) {
@@ -59,23 +62,44 @@ function expenseMap(summary: Summary) {
   return map
 }
 
+function mapStats(rows: ApiStatRow[]): CategoryStat[] {
+  return rows.map((r) => ({
+    id: String(r.id),
+    name: String(r.name ?? ''),
+    kind: String(r.kind ?? 'expense'),
+    color: (r.color as string | null) ?? null,
+    icon: (r.icon as string | null) ?? null,
+    spentMonth: Number(r.spent_month ?? r.spentMonth ?? 0),
+    spentYear: Number(r.spent_year ?? r.spentYear ?? 0),
+    spentAll: Number(r.spent_all ?? r.spentAll ?? 0),
+    budgetId: (r.budget_id ?? r.budgetId) as string | undefined,
+    amountLimit: Number(r.budget_limit ?? r.amountLimit ?? 0),
+  }))
+}
+
 export function BudgetsPage() {
   const { year, month } = currentYearMonth()
   const [stats, setStats] = useState<CategoryStat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [catForm, setCatForm] = useState({ name: '', kind: 'expense' })
+  const [catForm, setCatForm] = useState({ name: '', kind: 'expense', icon: '' })
   const [editingBudget, setEditingBudget] = useState<Record<string, string>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      let rows: CategoryStat[] | null = null
+      let mapped: CategoryStat[] | null = null
       try {
-        rows = await api.get<CategoryStat[]>('/api/categories/stats')
+        const rows = await api.get<ApiStatRow[]>('/api/categories/stats')
+        if (rows?.length) mapped = mapStats(rows)
       } catch {
-        rows = null
+        mapped = null
+      }
+
+      if (mapped) {
+        setStats(mapped)
+        return
       }
 
       const [cats, budgets, monthSummary, yearSummary, allSummary] = await Promise.all([
@@ -90,31 +114,27 @@ export function BudgetsPage() {
         api.get<Summary>(`/api/reports/summary?from=2000-01-01&to=${todayISO()}`),
       ])
 
-      if (rows?.length) {
-        setStats(rows)
-      } else {
-        const monthSpent = expenseMap(monthSummary)
-        const yearSpent = expenseMap(yearSummary)
-        const allSpent = expenseMap(allSummary)
-        const budgetByCat = Object.fromEntries(
-          budgets.map((b) => [b.category_id, { id: b.id, limit: Number(b.amount_limit) }]),
-        )
+      const monthSpent = expenseMap(monthSummary)
+      const yearSpent = expenseMap(yearSummary)
+      const allSpent = expenseMap(allSummary)
+      const budgetByCat = Object.fromEntries(
+        budgets.map((b) => [b.category_id, { id: b.id, limit: Number(b.amount_limit) }]),
+      )
 
-        setStats(
-          cats.map((c) => ({
-            id: c.id,
-            name: c.name,
-            kind: c.kind,
-            color: c.color,
-            icon: c.icon,
-            spentMonth: monthSpent.get(c.name) ?? 0,
-            spentYear: yearSpent.get(c.name) ?? 0,
-            spentAll: allSpent.get(c.name) ?? 0,
-            budgetId: budgetByCat[c.id]?.id,
-            amountLimit: budgetByCat[c.id]?.limit ?? 0,
-          })),
-        )
-      }
+      setStats(
+        cats.map((c) => ({
+          id: c.id,
+          name: c.name,
+          kind: c.kind,
+          color: c.color,
+          icon: c.icon,
+          spentMonth: monthSpent.get(c.name) ?? 0,
+          spentYear: yearSpent.get(c.name) ?? 0,
+          spentAll: allSpent.get(c.name) ?? 0,
+          budgetId: budgetByCat[c.id]?.id,
+          amountLimit: budgetByCat[c.id]?.limit ?? 0,
+        })),
+      )
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro')
     } finally {
@@ -128,8 +148,12 @@ export function BudgetsPage() {
 
   async function createCategory(e: FormEvent) {
     e.preventDefault()
-    await api.post('/api/categories', { name: catForm.name, kind: catForm.kind })
-    setCatForm({ name: '', kind: 'expense' })
+    await api.post('/api/categories', {
+      name: catForm.name,
+      kind: catForm.kind,
+      icon: catForm.icon || null,
+    })
+    setCatForm({ name: '', kind: 'expense', icon: '' })
     await load()
   }
 
@@ -162,8 +186,8 @@ export function BudgetsPage() {
           <CardTitle className="text-base">Nova categoria</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={createCategory} className="flex flex-wrap items-end gap-4">
-            <div className="min-w-[200px] flex-1 space-y-2">
+          <form onSubmit={createCategory} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
+            <div className="space-y-2">
               <Label htmlFor="cat-name">Nome</Label>
               <Input
                 id="cat-name"
@@ -172,10 +196,10 @@ export function BudgetsPage() {
                 required
               />
             </div>
-            <div className="min-w-[140px] space-y-2">
+            <div className="space-y-2">
               <Label>Tipo</Label>
               <Select value={catForm.kind} onValueChange={(v) => setCatForm({ ...catForm, kind: v })}>
-                <SelectTrigger>
+                <SelectTrigger className="h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -185,11 +209,29 @@ export function BudgetsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit">Adicionar categoria</Button>
+            <div className="space-y-2">
+              <Label>Ícone</Label>
+              <Select
+                value={catForm.icon || '__auto__'}
+                onValueChange={(v) => setCatForm({ ...catForm, icon: v === '__auto__' ? '' : v })}
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Automático" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__auto__">Automático pelo nome</SelectItem>
+                  {categoryEmojiOptions().map((emoji) => (
+                    <SelectItem key={emoji} value={emoji}>
+                      {emoji}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" className="h-10">
+              Adicionar categoria
+            </Button>
           </form>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Ao criar uma categoria de despesa, o Fluxo pode gerar um orçamento mensal automaticamente.
-          </p>
         </CardContent>
       </Card>
 
@@ -225,13 +267,7 @@ export function BudgetsPage() {
                       <TableRow key={row.id}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            {row.color && (
-                              <span
-                                className="inline-block h-3 w-3 shrink-0 rounded-full"
-                                style={{ backgroundColor: row.color }}
-                              />
-                            )}
-                            {row.icon && <span className="text-sm">{row.icon}</span>}
+                            <CategoryIcon name={row.name} icon={row.icon} color={row.color} />
                             <span>{row.name}</span>
                           </div>
                           {row.amountLimit > 0 && (
@@ -262,23 +298,15 @@ export function BudgetsPage() {
                             onChange={(e) =>
                               setEditingBudget((prev) => ({ ...prev, [row.id]: e.target.value }))
                             }
-                            onFocus={() => {
-                              if (editingBudget[row.id] === undefined) {
-                                setEditingBudget((prev) => ({
-                                  ...prev,
-                                  [row.id]: String(row.amountLimit || ''),
-                                }))
-                              }
-                            }}
                           />
                         </TableCell>
                         <TableCell>
                           <Button
-                            size="sm"
                             type="button"
+                            size="sm"
                             variant="outline"
-                            disabled={!editing && Number(limitValue) === row.amountLimit}
-                            onClick={() => saveBudget(row.id)}
+                            disabled={!editing}
+                            onClick={() => void saveBudget(row.id)}
                           >
                             Salvar
                           </Button>

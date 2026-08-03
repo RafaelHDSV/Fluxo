@@ -24,6 +24,7 @@ router.get('/', async (req, res) => {
         where t.user_id = b.user_id
           and t.category_id = b.category_id
           and t.type = 'expense'
+          and t.paid = true
           and date_trunc('month', (${EFF_T})::timestamp) = date_trunc('month', b.month::timestamp)
       ), 0) as spent
      from ${T.budgets} b

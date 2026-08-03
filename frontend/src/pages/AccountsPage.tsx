@@ -23,7 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatBRL } from '@/lib/format'
-import { accountTypeLabel, labelOf } from '@/lib/labels'
+import { accountTypeLabel, accountTypeLabelAll, labelOf } from '@/lib/labels'
 import { api } from '@/services/api'
 
 type Account = {
@@ -120,7 +120,7 @@ export function AccountsPage() {
     <div className="space-y-6">
       <header>
         <h1 className="font-display text-2xl font-semibold tracking-tight">Contas</h1>
-        <p className="text-muted-foreground">Contas correntes, cartões e carteiras — origens do seu dinheiro.</p>
+        <p className="text-muted-foreground">Contas correntes e cartões de crédito — origens do seu dinheiro.</p>
       </header>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -130,7 +130,7 @@ export function AccountsPage() {
           <CardTitle className="text-base">{editingId ? 'Editar conta' : 'Nova conta / cartão'}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={saveAccount} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <form onSubmit={saveAccount} className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="acc-name">Nome</Label>
               <Input
@@ -143,7 +143,7 @@ export function AccountsPage() {
             <div className="space-y-2">
               <Label>Tipo</Label>
               <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
-                <SelectTrigger>
+                <SelectTrigger className="h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -251,7 +251,7 @@ export function AccountsPage() {
                     <TableRow key={a.id}>
                       <TableCell>{a.name}</TableCell>
                       <TableCell>
-                        <Badge variant="muted">{labelOf(accountTypeLabel, a.type)}</Badge>
+                        <Badge variant="muted">{labelOf(accountTypeLabelAll, a.type)}</Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono tabular-nums">{formatBRL(a.balance)}</TableCell>
                       <TableCell>{a.type === 'credit_card' ? (a.closing_day ?? '—') : '—'}</TableCell>

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { DatePicker } from '@/components/ui/date-picker'
@@ -32,6 +32,11 @@ export function InvestmentsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  const totalCurrent = useMemo(
+    () => goals.reduce((sum, g) => sum + Number(g.current_amount || 0), 0),
+    [goals],
+  )
+
   async function load() {
     setLoading(true)
     setError('')
@@ -52,8 +57,8 @@ export function InvestmentsPage() {
     e.preventDefault()
     await api.post('/api/goals', {
       name: form.name,
-      target_amount: Number(form.target_amount),
-      current_amount: Number(form.current_amount),
+      target_amount: form.target_amount === '' ? 0 : Number(form.target_amount),
+      current_amount: Number(form.current_amount || 0),
       deadline: form.deadline || null,
     })
     setForm({ name: '', target_amount: '', current_amount: '0', deadline: '' })
@@ -90,7 +95,7 @@ export function InvestmentsPage() {
           <CardTitle className="text-base">Nova caixinha</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <form onSubmit={onSubmit} className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
               <Label htmlFor="inv-name">Nome</Label>
               <Input
@@ -102,7 +107,7 @@ export function InvestmentsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="inv-target">Valor alvo</Label>
+              <Label htmlFor="inv-target">Valor alvo (opcional)</Label>
               <Input
                 id="inv-target"
                 type="number"
@@ -110,7 +115,7 @@ export function InvestmentsPage() {
                 step="0.01"
                 value={form.target_amount}
                 onChange={(e) => setForm({ ...form, target_amount: e.target.value })}
-                required
+                placeholder="0"
               />
             </div>
             <div className="space-y-2">
@@ -129,7 +134,9 @@ export function InvestmentsPage() {
               <DatePicker value={form.deadline} onChange={(deadline) => setForm({ ...form, deadline })} />
             </div>
             <div className="flex items-end">
-              <Button type="submit">Criar caixinha</Button>
+              <Button type="submit" className="h-10">
+                Criar caixinha
+              </Button>
             </div>
           </form>
         </CardContent>
@@ -137,7 +144,14 @@ export function InvestmentsPage() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Suas caixinhas</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="text-base">Suas caixinhas</CardTitle>
+            {!loading && goals.length > 0 && (
+              <p className="font-mono text-sm tabular-nums text-muted-foreground">
+                Total: <span className="font-medium text-foreground">{formatBRL(totalCurrent)}</span>
+              </p>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -155,7 +169,8 @@ export function InvestmentsPage() {
               {goals.map((g) => {
                 const current = Number(g.current_amount)
                 const target = Number(g.target_amount)
-                const pct = target > 0 ? Math.min(100, (current / target) * 100) : 0
+                const hasTarget = target > 0
+                const pct = hasTarget ? Math.min(100, (current / target) * 100) : 0
                 return (
                   <div key={g.id} className="rounded-lg border border-border p-4">
                     <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
@@ -167,7 +182,13 @@ export function InvestmentsPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-sm tabular-nums">
-                          {formatBRL(current)} / {formatBRL(target)}
+                          {hasTarget ? (
+                            <>
+                              {formatBRL(current)} / {formatBRL(target)}
+                            </>
+                          ) : (
+                            formatBRL(current)
+                          )}
                         </span>
                         <Button
                           variant="ghost"
@@ -181,8 +202,12 @@ export function InvestmentsPage() {
                         </Button>
                       </div>
                     </div>
-                    <Progress value={pct} className="h-2" />
-                    <p className="mt-1 text-xs text-muted-foreground">{pct.toFixed(0)}% do objetivo</p>
+                    {hasTarget && (
+                      <>
+                        <Progress value={pct} className="h-2" />
+                        <p className="mt-1 text-xs text-muted-foreground">{pct.toFixed(0)}% do objetivo</p>
+                      </>
+                    )}
                   </div>
                 )
               })}

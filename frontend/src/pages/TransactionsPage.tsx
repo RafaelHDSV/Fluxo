@@ -28,6 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { CategoryIcon } from '@/lib/categoryIcons'
 import { computeCreditDueDate } from '@/lib/creditCycle'
 import { formatBRL, formatDate, formatMonth, formatSignedBRL, todayISO } from '@/lib/format'
 import { currentYearMonth, periodBounds, type PeriodMode } from '@/lib/period'
@@ -35,14 +36,14 @@ import { labelOf, paymentMethodLabel, transactionTypeLabel } from '@/lib/labels'
 import { cn } from '@/lib/utils'
 import { api } from '@/services/api'
 
-type Account = {
+  type Account = {
   id: string
   name: string
   type?: string
   due_day?: number | null
   closing_day?: number | null
 }
-type Category = { id: string; name: string }
+type Category = { id: string; name: string; icon?: string | null; color?: string | null }
 type Tx = {
   id: string
   date: string
@@ -75,7 +76,7 @@ const emptyForm = {
   due_date: '',
   transfer_account_id: '',
   notes: '',
-  paid: true,
+  paid: false,
   payment_method: 'debit' as '' | 'debit' | 'credit',
 }
 
@@ -83,10 +84,14 @@ function monthKey(date: string) {
   return String(date).slice(0, 7)
 }
 
+function formTypeFromUrl(raw: string | null) {
+  if (raw === 'income' || raw === 'expense' || raw === 'transfer' || raw === 'adjustment') return raw
+  return 'expense'
+}
 
 function parsePeriodMode(raw: string | null): PeriodMode {
   if (raw === 'month' || raw === 'year' || raw === 'all') return raw
-  return 'all'
+  return 'month'
 }
 
 function parseFilterMode(raw: string | null): 'all' | 'a_pagar' {
@@ -130,7 +135,11 @@ export function TransactionsPage() {
     const m = Number(searchParams.get('month'))
     return Number.isFinite(m) && m >= 1 && m <= 12 ? m : defaultMonth
   })
-  const [form, setForm] = useState(emptyForm)
+  const [form, setForm] = useState(() => ({
+    ...emptyForm,
+    type: formTypeFromUrl(searchParams.get('type')),
+    paid: formTypeFromUrl(searchParams.get('type')) === 'income' ? true : false,
+  }))
   const [editingId, setEditingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -153,7 +162,7 @@ export function TransactionsPage() {
   const tableColSpan = colSpanFor(showMeioColumn, isIncomeOnly)
 
   const categoryMap = useMemo(
-    () => Object.fromEntries(categories.map((c) => [c.id, c.name])),
+    () => Object.fromEntries(categories.map((c) => [c.id, c])),
     [categories],
   )
   const accountMap = useMemo(() => Object.fromEntries(accounts.map((a) => [a.id, a.name])), [accounts])
@@ -275,6 +284,18 @@ export function TransactionsPage() {
     load()
   }, [load])
 
+  // Atalhos do dashboard (?type=income) atualizam o form de novo lançamento
+  useEffect(() => {
+    if (editingId) return
+    const urlType = formTypeFromUrl(searchParams.get('type'))
+    setForm((f) => ({
+      ...f,
+      type: urlType,
+      paid: urlType === 'income' ? true : f.type === urlType ? f.paid : false,
+      payment_method: urlType === 'expense' ? f.payment_method || 'debit' : '',
+    }))
+  }, [searchParams, editingId])
+
   function previewDueDate(purchaseDate: string, cardAccountId: string, cardList = creditCards) {
     const card = cardList.find((c) => c.id === cardAccountId)
     if (!card?.closing_day || !card?.due_day || !purchaseDate) return ''
@@ -296,7 +317,7 @@ export function TransactionsPage() {
       card_account_id: base.card_account_id,
       due_date: base.due_date,
       transfer_account_id: base.transfer_account_id,
-      paid: base.paid,
+      paid: base.type === 'income' ? true : false,
       payment_method: base.payment_method,
     }
   }
@@ -486,7 +507,7 @@ export function TransactionsPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
                 <Label>{isCreditForm ? 'Data da compra' : 'Data'}</Label>
                 <DatePicker
@@ -534,8 +555,18 @@ export function TransactionsPage() {
               </div>
               <div className="space-y-2">
                 <Label>Tipo</Label>
-                <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
-                  <SelectTrigger>
+                <Select
+                  value={form.type}
+                  onValueChange={(v) =>
+                    setForm({
+                      ...form,
+                      type: v,
+                      paid: v === 'income' ? true : false,
+                      payment_method: v === 'expense' ? form.payment_method || 'debit' : '',
+                    })
+                  }
+                >
+                  <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -660,13 +691,16 @@ export function TransactionsPage() {
                   value={form.category_id}
                   onValueChange={(v) => setForm({ ...form, category_id: v })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
-                        {c.name}
+                        <span className="flex items-center gap-2">
+                          <CategoryIcon name={c.name} icon={c.icon} color={c.color} />
+                          {c.name}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -675,7 +709,7 @@ export function TransactionsPage() {
               <div className="space-y-2">
                 <Label>Conta</Label>
                 <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -939,8 +973,19 @@ export function TransactionsPage() {
                             <TableCell className="max-w-[220px]">
                               <TruncatedText text={tx.description} />
                             </TableCell>
-                            <TableCell className="max-w-[140px]">
-                              <TruncatedText text={categoryMap[tx.category_id] || '—'} />
+                            <TableCell className="max-w-[160px]">
+                              {categoryMap[tx.category_id] ? (
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <CategoryIcon
+                                    name={categoryMap[tx.category_id].name}
+                                    icon={categoryMap[tx.category_id].icon}
+                                    color={categoryMap[tx.category_id].color}
+                                  />
+                                  <TruncatedText text={categoryMap[tx.category_id].name} />
+                                </span>
+                              ) : (
+                                '—'
+                              )}
                             </TableCell>
                             <TableCell className="max-w-[120px]">
                               <TruncatedText text={accountMap[tx.account_id] || '—'} />

@@ -340,6 +340,7 @@ router.get('/summary', async (req, res) => {
      from ${T.transactions} t
      join ${T.categories} c on c.id = t.category_id
      where t.user_id = $1 and ${EFF_T} between $2 and $3
+       and (t.type <> 'expense' or t.paid = true)
        and ($4::uuid is null or t.account_id = $4)
        and ($5::uuid is null or t.category_id = $5)
        and ($6::text is null or $6 = any(t.tags))
@@ -353,6 +354,7 @@ router.get('/summary', async (req, res) => {
      from ${T.transactions} t
      join ${T.accounts} a on a.id = t.account_id
      where t.user_id = $1 and ${EFF_T} between $2 and $3
+       and (t.type <> 'expense' or t.paid = true)
        and ($4::uuid is null or t.account_id = $4)
        and ($5::uuid is null or t.category_id = $5)
        and ($6::text is null or $6 = any(t.tags))
