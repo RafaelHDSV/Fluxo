@@ -1,5 +1,7 @@
 .env
 
+ofx/*
+
 # Notion one-shot dump (PII / histórico pessoal)
 backend/scripts/data/*.json
 !backend/scripts/data/.gitkeep
@@ -37,17 +39,10 @@ versions/*
 out/*
 
 # Issues
-issues
-.issues
-.issues/
 .issues/*
-*.issues
-*.issues/*
 
 # AI Tools
-cursor
-.cursor
-.cursor/
+.ai/*
+.claude/*
 .cursor/*
-*.cursor
-*.cursor/*
+.opencode/*
