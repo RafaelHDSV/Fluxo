@@ -78,7 +78,7 @@ export function CategoryIcon({
     )
   }
 
-  const match = RULES.find((r) => r.test(name))
+  const match = RULES.find((r) => r.test.test(name ?? ''))
   const Icon = match?.Icon ?? MoreHorizontal
   return (
     <span

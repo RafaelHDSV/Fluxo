@@ -84,7 +84,7 @@ create table if not exists public.fluxo_goals (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   name text not null,
-  target_amount numeric(14, 2) not null check (target_amount > 0),
+  target_amount numeric(14, 2) not null default 0 check (target_amount >= 0),
   current_amount numeric(14, 2) not null default 0 check (current_amount >= 0),
   deadline date,
   account_id uuid references public.fluxo_accounts (id),
