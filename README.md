@@ -1,39 +1,107 @@
 # Fluxo
 
-Controle financeiro pessoal — dashboard, transações, importação OFX/CSV, orçamentos, investimentos, wishlist, contas a pagar e relatórios.
-
 > Veja seu dinheiro com clareza.
 
-**Epic:** [Fluxo #1](https://github.com/RafaelHDSV/Fluxo/issues/1)
+Controle financeiro pessoal para quem quer **entender o mês** sem virar planilha. O Fluxo concentra contas, lançamentos, importação de extrato, orçamentos, investimentos e o que ainda falta pagar — com dashboard e gráficos pensados para o dia a dia.
 
-## O que faz
+Feito para uso individual em BRL, com autenticação e dados isolados por usuário.
 
-- Consolida contas (débito e crédito) com **saldo como âncora**
-- Importa extrato **OFX Santander** (e CSV/OFX genérico) com regras e revisão passo a passo
-- Orça por categoria, acompanha **investimentos** (caixinhas) e **wishlist**
-- Mostra saúde do período no Dashboard e nos Relatórios (ECharts)
-- Separa no crédito a **data da compra** do **vencimento da fatura**
+---
+
+## Por que existe
+
+A maior parte das ferramentas financeiras ou é genérica demais, ou esconde o que importa atrás de agregadores caros. O Fluxo parte de decisões simples:
+
+- o **saldo das contas** é a âncora (não um histórico opaco)
+- a entrada mensal principal é o **OFX do Santander** (com CSV/OFX genérico de apoio)
+- no cartão, **compra** e **vencimento da fatura** são datas diferentes — o período usa o vencimento
+- Open Finance fica de fora de propósito (custo de agregador)
+
+---
+
+## Funcionalidades
+
+### Contas e saldo
+- Contas de débito e cartão de crédito
+- Saldo editável; importação OFX pode atualizar via `LEDGERBAL`
+- No crédito: dia de fechamento e dia de vencimento para calcular a fatura
+
+### Transações
+- Lançamentos manuais (receita e despesa)
+- Filtros por período (mês, ano ou histórico)
+- Crédito com data da compra + vencimento da fatura
+
+### Importações
+- OFX Santander (Money 2000+) e CSV/OFX genérico
+- Regras de renomeação e categorização
+- Preview + stepper para revisar linhas novas antes de gravar
+
+### Orçamentos e categorias
+- Limite de gasto por categoria
+- Progresso e alerta quando o uso se aproxima do limite
+
+### Investimentos e wishlist
+- Caixinhas de investimento com progresso
+- Lista de desejos com imagem opcional
+
+### A pagar, dashboard e relatórios
+- Visão do que está em aberto
+- KPIs do período, receita × despesa, gastos por categoria e resultado acumulado
+- Relatórios agregados no mesmo critério de período
+
+### Experiência
+- Tema claro e escuro
+- Sidebar no desktop; navegação inferior + menu “Mais” no celular
+- Layout pensado para telas pequenas (safe-area, filtros e calendário fluídos)
+
+---
 
 ## Stack
 
 | Camada | Tecnologia |
 |--------|------------|
-| Frontend | React 18, Vite, TypeScript, Tailwind + shadcn/ui, ECharts |
-| Backend | Express 5 (BFF) |
-| Auth / DB | Supabase (Postgres + Auth + RLS) |
+| Frontend | React 18, Vite, TypeScript, Tailwind, shadcn/ui, React Router, Apache ECharts, Lucide |
+| Backend | Node.js, Express 5 (BFF) |
+| Auth e banco | Supabase — PostgreSQL, Auth (e-mail/senha) e RLS |
+| Tooling | Yarn, Node 22+ |
+
+O front fala com o BFF; o BFF valida o JWT do Supabase e acessa o Postgres. As tabelas usam o prefixo `fluxo_*`.
+
+---
+
+## Pré-requisitos
+
+- Node.js 22 ou superior
+- Yarn
+- Projeto no [Supabase](https://supabase.com)
+
+---
 
 ## Setup
 
-1. Crie um projeto no Supabase e aplique as migrations em `backend/migrations/` **em ordem** (001 → 007) no SQL Editor.
-2. Copie os envs:
+### 1. Banco
+
+No SQL Editor do Supabase, aplique as migrations em `backend/migrations/` **na ordem** (001 → 007).
+
+### 2. Variáveis de ambiente
 
 ```bash
 cp frontend/.env.example frontend/.env
 cp backend/.env.example backend/.env
 ```
 
-3. Preencha URL, anon key, JWT secret e `DATABASE_URL` do Supabase.
-4. Instale e suba:
+Preencha com os dados do seu projeto Supabase:
+
+| Variável | Onde | Uso |
+|----------|------|-----|
+| `VITE_SUPABASE_URL` | frontend | URL do projeto |
+| `VITE_SUPABASE_ANON_KEY` | frontend | Chave anônima (cliente) |
+| `VITE_BACKEND_URL` | frontend | URL do BFF (`http://localhost:3693` em local) |
+| `SUPABASE_URL` / JWT / `DATABASE_URL` | backend | Conforme o `.env.example` do back |
+
+Nunca commite arquivos `.env` com valores reais.
+
+### 3. Subir localmente
 
 ```bash
 yarn
@@ -42,33 +110,68 @@ yarn dev
 
 | Serviço | URL |
 |---------|-----|
-| Front | http://localhost:3333 |
-| API | http://localhost:3693 |
+| Frontend | http://localhost:3333 |
+| API (BFF) | http://localhost:3693 |
+
+Crie uma conta pela tela de registro e comece pelas contas (saldo) e, se quiser, pela importação OFX.
+
+---
 
 ## Scripts úteis
 
 ```bash
-cd backend && yarn test     # parsers / dedupe
+cd backend && yarn test      # parsers OFX/CSV e ciclo de crédito
+cd frontend && yarn lint
 cd frontend && yarn build
 cd backend && yarn build
-cd frontend && yarn lint
 ```
 
-## Documentação
+---
 
-| Arquivo | Conteúdo |
-|---------|----------|
-| [`docs/context.md`](./docs/context.md) | Contexto para IA (stack, decisões, migrations) |
-| [`docs/especificacao.md`](./docs/especificacao.md) | Produto e escopo |
-| [`docs/DESIGN.md`](./docs/DESIGN.md) | Identidade visual |
-| [`docs/superpowers/specs/`](./docs/superpowers/specs/) | Specs de features |
-| [`.issues/`](./.issues/) | Propostas de implementação |
+## Deploy
+
+### Frontend (Vercel)
+
+O `vercel.json` na raiz configura o build do Vite em `frontend/` e o rewrite de SPA.
+
+1. Importe o repositório na Vercel (raiz do repo).
+2. Configure:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_BACKEND_URL` — URL **pública** do BFF
+3. Publique.
+
+Se preferir, use Root Directory = `frontend` (há um `vercel.json` equivalente nessa pasta).
+
+### Backend (BFF)
+
+A Vercel hospeda só o front. Hospede o Express em outro serviço (Railway, Fly.io, VPS, etc.), com as variáveis do `backend/.env.example`, e aponte `VITE_BACKEND_URL` para essa URL. Libere CORS para o domínio do front.
+
+---
 
 ## Contribuindo
 
+Pull requests são bem-vindos. Antes de abrir um PR:
+
+1. Descreva o problema e a solução no corpo do PR
+2. Rode lint, testes e build
+3. Evite secrets no diff
+
 Veja [CONTRIBUTING.md](./CONTRIBUTING.md) e o [Código de Conduta](./CODE_OF_CONDUCT.md).  
-Vulnerabilidades: [SECURITY.md](./SECURITY.md).
+Vulnerabilidades: reporte em privado — [SECURITY.md](./SECURITY.md).
+
+---
 
 ## Licença
 
-MIT © 2026 Rafael Vieira — [LICENSE](./LICENSE).
+MIT © 2026 [Rafael Vieira](https://github.com/RafaelHDSV) — [LICENSE](./LICENSE).
+
+---
+
+## Apoie o projeto
+
+Se o Fluxo te ajudou a organizar as finanças ou serviu de base para outro trabalho, um café faz diferença.
+
+<a href="https://www.buymeacoffee.com/vieira" target="_blank" rel="noopener noreferrer">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="48" width="174" />
+</a>

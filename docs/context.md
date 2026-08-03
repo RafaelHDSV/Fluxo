@@ -105,6 +105,7 @@ Dashboard · Transações · A pagar · Importações · Contas · Orçamentos �
 | Proposta v1.2 | `.issues/2026-08-02-fluxo-v1.2-ux-import.md` |
 | Design visual | `docs/DESIGN.md` |
 | Especificação | `docs/especificacao.md` |
+| Deploy front | `vercel.json` (raiz) — SPA Vite; BFF fora da Vercel |
 
 ---
 
