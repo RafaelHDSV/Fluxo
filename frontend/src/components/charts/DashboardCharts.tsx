@@ -1,5 +1,6 @@
 import ReactECharts from 'echarts-for-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { formatBRL, formatDate, formatMonth } from '@/lib/format'
 
 type Props = {
@@ -27,6 +28,10 @@ export function DashboardCharts({
   openingBalance = 0,
   loading,
 }: Props) {
+  const narrow = useMediaQuery('(max-width: 639px)')
+  const yAxisFontSize = narrow ? 10 : 12
+  const gridLeft = narrow ? 36 : 48
+
   if (loading) {
     return (
       <div className="grid gap-6 lg:grid-cols-2">
@@ -64,11 +69,14 @@ export function DashboardCharts({
       top: 8,
       textStyle: { color: '#8b9aab' },
     },
-    grid: { left: 48, right: 16, top: 56, bottom: 30 },
+    grid: { left: gridLeft, right: 16, top: 56, bottom: 30 },
     xAxis: { type: 'category', data: chartMonthly.map((m) => formatMonth(m.month)) },
     yAxis: {
       type: 'value',
-      axisLabel: { formatter: (v: number) => formatBRL(v).replace(/\s/g, '\u00a0') },
+      axisLabel: {
+        fontSize: yAxisFontSize,
+        formatter: (v: number) => formatBRL(v).replace(/\s/g, '\u00a0'),
+      },
     },
     series: [
       {
@@ -117,7 +125,7 @@ export function DashboardCharts({
         return `${formatDate(p.axisValue)}<br/>Resultado: ${formatBRL(p.value)}`
       },
     },
-    grid: { left: 48, right: 16, top: 24, bottom: 30 },
+    grid: { left: gridLeft, right: 16, top: 24, bottom: 30 },
     xAxis: {
       type: 'category',
       data: cashflow.map((b) => b.date),
@@ -125,7 +133,10 @@ export function DashboardCharts({
     },
     yAxis: {
       type: 'value',
-      axisLabel: { formatter: (v: number) => formatBRL(v).replace(/\s/g, '\u00a0') },
+      axisLabel: {
+        fontSize: yAxisFontSize,
+        formatter: (v: number) => formatBRL(v).replace(/\s/g, '\u00a0'),
+      },
     },
     series: [
       {
@@ -145,7 +156,7 @@ export function DashboardCharts({
       <div>
         <h3 className="mb-2 font-medium">Receita × despesa</h3>
         {hasMonthly ? (
-          <ReactECharts option={bars} style={{ height: 280 }} />
+          <ReactECharts key={`bars-${narrow}`} option={bars} style={{ height: 280 }} />
         ) : (
           <EmptyChart title="Receita × despesa" message="Sem lançamentos nos últimos meses." />
         )}
@@ -161,7 +172,7 @@ export function DashboardCharts({
       <div className="lg:col-span-2">
         <h3 className="mb-2 font-medium">Resultado no período</h3>
         {hasCashflow ? (
-          <ReactECharts option={line} style={{ height: 260 }} />
+          <ReactECharts key={`line-${narrow}`} option={line} style={{ height: 260 }} />
         ) : (
           <EmptyChart title="Resultado no período" message="Cadastre transações para ver o resultado acumulado." />
         )}

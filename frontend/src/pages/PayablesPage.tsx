@@ -223,7 +223,7 @@ export function PayablesPage() {
           <div className="space-y-2">
             <Label>Período</Label>
             <Select value={filter} onValueChange={(v) => setFilter(v as PayablesFilter)}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -238,7 +238,7 @@ export function PayablesPage() {
               <div className="space-y-2">
                 <Label>Ano</Label>
                 <Select value={String(pickYear)} onValueChange={(v) => setPickYear(Number(v))}>
-                  <SelectTrigger className="w-[100px]">
+                  <SelectTrigger className="w-full sm:w-[100px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -256,7 +256,7 @@ export function PayablesPage() {
                   type="number"
                   min={1}
                   max={12}
-                  className="w-[72px]"
+                  className="w-full sm:w-[72px]"
                   value={pickMonth}
                   onChange={(e) => setPickMonth(Math.min(12, Math.max(1, Number(e.target.value) || 1)))}
                 />

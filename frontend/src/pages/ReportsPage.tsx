@@ -178,7 +178,7 @@ export function ReportsPage() {
             <div className="space-y-2">
               <Label>Ano</Label>
               <Select value={String(calendarYear)} onValueChange={(v) => setCalendarYear(Number(v))}>
-                <SelectTrigger className="w-[120px]">
+                <SelectTrigger className="w-full sm:w-[120px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -279,7 +279,7 @@ export function ReportsPage() {
               <div className="space-y-2">
                 <Label>Período rápido</Label>
                 <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as PeriodMode)}>
-                  <SelectTrigger className="h-10 w-[160px]">
+                  <SelectTrigger className="h-10 w-full sm:w-[160px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -293,7 +293,7 @@ export function ReportsPage() {
                 <div className="space-y-2">
                   <Label>Ano</Label>
                   <Select value={String(periodYear)} onValueChange={(v) => setPeriodYear(Number(v))}>
-                    <SelectTrigger className="h-10 w-[100px]">
+                    <SelectTrigger className="h-10 w-full sm:w-[100px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -313,7 +313,7 @@ export function ReportsPage() {
                     type="number"
                     min={1}
                     max={12}
-                    className="h-10 w-[72px]"
+                    className="h-10 w-full sm:w-[72px]"
                     value={periodMonth}
                     onChange={(e) =>
                       setPeriodMonth(Math.min(12, Math.max(1, Number(e.target.value) || 1)))

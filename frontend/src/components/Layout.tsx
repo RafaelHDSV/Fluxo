@@ -98,11 +98,11 @@ export function Layout() {
         </div>
       </aside>
 
-      <main className="min-h-screen min-w-0 flex-1 overflow-y-auto px-4 pb-24 pt-5 lg:px-8 lg:pb-8 lg:pt-8">
+      <main className="min-h-screen min-w-0 flex-1 overflow-y-auto px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 lg:px-8 lg:pb-8 lg:pt-8">
         <Outlet />
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-surface/95 backdrop-blur lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
         {mobilePrimary.map((to) => {
           if (to === '/more') {
             return (
@@ -146,9 +146,9 @@ export function Layout() {
       {moreOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button type="button" className="absolute inset-0 bg-black/50" onClick={() => setMoreOpen(false)} />
-          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border border-border bg-surface p-4 pb-8">
-            <p className="mb-3 font-display text-lg">Navegação</p>
-            <div className="grid gap-2">
+          <div className="absolute inset-x-0 bottom-0 flex max-h-[min(85dvh,100%)] flex-col rounded-t-2xl border border-border bg-surface pb-[env(safe-area-inset-bottom)]">
+            <p className="shrink-0 px-4 pb-2 pt-4 font-display text-lg">Navegação</p>
+            <div className="min-h-0 flex-1 grid gap-2 overflow-y-auto px-4 pb-8">
               {links.map((link) => {
                 const Icon = link.icon
                 return (

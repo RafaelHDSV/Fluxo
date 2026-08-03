@@ -201,7 +201,7 @@ export function DatePicker({ id, value, onChange, required, className, disabled 
         <div
           role="dialog"
           aria-label="Calendário"
-          className="absolute left-0 top-full z-50 mt-1 w-[280px] rounded-xl border border-border bg-surface p-3 shadow-lg"
+          className="absolute left-0 top-full z-50 mt-1 w-[min(100%,280px)] max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-surface p-3 shadow-lg"
         >
           <div className="mb-3 flex items-center justify-between gap-2">
             <Button
