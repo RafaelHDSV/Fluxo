@@ -1,6 +1,5 @@
 import { ExternalLink, Pencil, Trash2 } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
-import notionDump from '@/data/notion-wishlist.json'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -38,8 +37,6 @@ export function WishlistPage() {
   const [hidePurchased, setHidePurchased] = useState(true)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
-  const [importing, setImporting] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -104,26 +101,6 @@ export function WishlistPage() {
     await load()
   }
 
-  async function importFromDump() {
-    setImporting(true)
-    setMessage('')
-    setError('')
-    try {
-      const result = await api.post<{ inserted: number; skipped: number; total: number }>(
-        '/api/wishlist/import',
-        notionDump,
-      )
-      setMessage(
-        `Importação concluída: ${result.inserted} inseridos, ${result.skipped} ignorados (de ${result.total}).`,
-      )
-      await load()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro na importação')
-    } finally {
-      setImporting(false)
-    }
-  }
-
   function startEdit(item: WishItem) {
     setEditingId(item.id)
     setForm({
@@ -142,18 +119,12 @@ export function WishlistPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Wishlist</h1>
-          <p className="text-muted-foreground">Itens desejados, progresso de economia e compras.</p>
-        </div>
-        <Button variant="outline" type="button" disabled={importing} onClick={importFromDump}>
-          {importing ? 'Importando…' : 'Importar dump JSON'}
-        </Button>
+      <header>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">Wishlist</h1>
+        <p className="text-muted-foreground">Itens desejados, progresso de economia e compras.</p>
       </header>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {message && <p className="text-sm text-primary">{message}</p>}
 
       <Card>
         <CardHeader className="pb-2">
@@ -240,7 +211,7 @@ export function WishlistPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <p className="text-sm text-muted-foreground">Nenhum item na wishlist.</p>
-            <p className="mt-1 text-xs text-muted-foreground">Adicione um item ou importe um dump JSON.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Adicione um item pelo formulário acima.</p>
           </CardContent>
         </Card>
       ) : (
