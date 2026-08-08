@@ -90,11 +90,11 @@ export function DashboardPage() {
   const yearOptions = Array.from({ length: 5 }, (_, i) => defaultYear - 2 + i)
   const unpaidTotal = data?.unpaidTotal ?? 0
   const unpaidCount = data?.unpaidCount ?? 0
-  const projectedAfterPayables = data ? data.balance - unpaidTotal : 0
   const carryIn =
     data?.openingBalance != null && Number.isFinite(data.openingBalance) ? data.openingBalance : 0
   const receitasTotais = data ? data.income + carryIn : 0
   const saldoMes = data ? receitasTotais - data.expense : 0
+  const projectedAfterPayables = saldoMes - unpaidTotal
   const showCarryIn = periodMode !== 'all'
 
   return (
@@ -227,7 +227,7 @@ export function DashboardPage() {
               label="Saldo após a pagar"
               value={formatBRL(projectedAfterPayables)}
               tone={projectedAfterPayables >= 0 ? 'positive' : 'negative'}
-              hint="Contas − a pagar"
+              hint="Saldo do mês − a pagar"
             />
           </div>
 
