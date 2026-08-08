@@ -79,6 +79,11 @@ export function PayablesPage() {
   const allSelected = itemIds.length > 0 && itemIds.every((id) => selectedIds.has(id))
   const someSelected = itemIds.some((id) => selectedIds.has(id))
 
+  const creditItems = useMemo(
+    () => items.filter((tx) => tx.payment_method === 'credit' && tx.due_date),
+    [items],
+  )
+
   const totals = useMemo(() => {
     let total = 0
     let credit = 0
@@ -207,6 +212,31 @@ export function PayablesPage() {
     }
   }
 
+  async function markAllCreditPaid() {
+    if (creditItems.length === 0) return
+    const ids = creditItems.map((t) => t.id)
+    const idSet = new Set(ids)
+    setBulkBusy(true)
+    setError('')
+    try {
+      await api.post<{ updated: number }>('/api/transactions/bulk-paid', {
+        ids,
+        paid: true,
+      })
+      setItems((prev) => prev.filter((t) => !idSet.has(t.id)))
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        for (const id of ids) next.delete(id)
+        return next
+      })
+      selectionAnchorRef.current = null
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao marcar fatura como paga')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   const yearOptions = Array.from({ length: 5 }, (_, i) => defaultYear - 2 + i)
 
   return (
@@ -285,13 +315,27 @@ export function PayablesPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base text-muted-foreground">No cartão</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             {loading ? (
               <Skeleton className="h-8 w-32" />
             ) : (
-              <p className="font-mono text-2xl font-semibold tabular-nums">
-                {formatBRL(totals.credit)}
-              </p>
+              <>
+                <p className="font-mono text-2xl font-semibold tabular-nums">
+                  {formatBRL(totals.credit)}
+                </p>
+                {creditItems.length > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                    disabled={bulkBusy}
+                    onClick={() => void markAllCreditPaid()}
+                  >
+                    Marcar fatura paga ({creditItems.length})
+                  </Button>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
