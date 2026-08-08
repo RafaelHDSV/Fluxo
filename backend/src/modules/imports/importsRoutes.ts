@@ -23,11 +23,12 @@ router.post('/preview', upload.single('file'), async (req, res) => {
   const sourceType = isOfx ? 'ofx' : 'csv'
   const mapping = req.body.mapping ? JSON.parse(String(req.body.mapping)) : undefined
   const parsed = isOfx ? parseOfx(content) : parseCsv(content, mapping)
+  const ledgerBalance = isOfx ? parseOfxLedgerBalance(content) : null
 
   const imp = await queryOne<{ id: string }>(
-    `insert into ${T.imports} (user_id, filename, source_type, status, account_id)
-     values ($1,$2,$3,'preview',$4) returning id`,
-    [req.userId, file.originalname, sourceType, accountId],
+    `insert into ${T.imports} (user_id, filename, source_type, status, account_id, ledger_balance)
+     values ($1,$2,$3,'preview',$4,$5) returning id`,
+    [req.userId, file.originalname, sourceType, accountId, ledgerBalance],
   )
 
   const existing = await query<{ dedupe_hash: string }>(
@@ -78,7 +79,7 @@ router.post('/preview', upload.single('file'), async (req, res) => {
   res.status(201).json({
     import: imp,
     rows,
-    ledger_balance: isOfx ? parseOfxLedgerBalance(content) : null,
+    ledger_balance: ledgerBalance,
   })
 })
 
@@ -129,10 +130,12 @@ router.patch('/:id/rows/:rowId', async (req, res) => {
 })
 
 router.post('/:id/commit', async (req, res) => {
-  const imp = await queryOne<{ id: string; account_id: string; status: string }>(
-    `select * from ${T.imports} where id = $1 and user_id = $2`,
-    [req.params.id, req.userId],
-  )
+  const imp = await queryOne<{
+    id: string
+    account_id: string
+    status: string
+    ledger_balance: string | null
+  }>(`select * from ${T.imports} where id = $1 and user_id = $2`, [req.params.id, req.userId])
   if (!imp) return res.status(404).json({ error: 'Importação não encontrada' })
   if (imp.status === 'committed') {
     return res.status(400).json({ error: 'Importação já confirmada' })
@@ -192,7 +195,8 @@ router.post('/:id/commit', async (req, res) => {
 
   await queryOne(`update ${T.imports} set status = 'committed' where id = $1`, [imp.id])
 
-  const ledgerRaw = req.body?.ledger_balance
+  // Preferência: body do client → valor persistido no preview (OFX LEDGERBAL).
+  const ledgerRaw = req.body?.ledger_balance ?? imp.ledger_balance
   const ledger = ledgerRaw == null || ledgerRaw === '' ? null : Number(ledgerRaw)
   if (ledger != null && Number.isFinite(ledger)) {
     await queryOne(`update ${T.accounts} set balance = $1 where id = $2 and user_id = $3`, [

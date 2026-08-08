@@ -91,6 +91,7 @@ Dashboard · Transações · A pagar · Importações · Contas · Orçamentos �
 | `005_description_rules.sql` | Regras de descrição na importação |
 | `006_due_date.sql` | Vencimento no crédito |
 | `007_goals_optional_target.sql` | Meta opcional em investimentos |
+| `008_import_ledger_balance.sql` | LEDGERBAL do OFX persistido no preview → commit |
 
 ---
 
