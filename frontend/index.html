@@ -16,5 +16,19 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- BMC website widget: no index.html porque o script escuta DOMContentLoaded
+         (injeção dinâmica no main.tsx chega tarde demais e o botão nunca monta) -->
+    <script
+      data-name="BMC-Widget"
+      data-cfasync="false"
+      src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js"
+      data-id="vieira"
+      data-description="Support me on Buy me a coffee!"
+      data-message=""
+      data-color="#3ddc97"
+      data-position="Right"
+      data-x_margin="18"
+      data-y_margin="18"
+    ></script>
   </body>
 </html>
