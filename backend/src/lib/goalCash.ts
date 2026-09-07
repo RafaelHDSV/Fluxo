@@ -1,15 +1,42 @@
 import { queryOne } from './db.js'
 import { T } from './tables.js'
 
+export type GoalDirection = 'to_goal' | 'from_goal'
+
+/** Normaliza direção; default aporte (conta → caixinha). */
+export function normalizeGoalDirection(value: unknown): GoalDirection {
+  return value === 'from_goal' ? 'from_goal' : 'to_goal'
+}
+
+/**
+ * Efeito na caixinha.
+ * Transferência + goal: to_goal sobe, from_goal desce.
+ * (Legado expense/income com goal_id deixa de ser suportado na API.)
+ */
 export function goalAmountDelta(input: {
   type: string
   amount: number
   goalId: string | null | undefined
+  goalDirection?: GoalDirection | null
 }): number {
-  if (!input.goalId) return 0
-  if (input.type === 'expense') return input.amount
-  if (input.type === 'income') return -input.amount
-  return 0
+  if (!input.goalId || input.type !== 'transfer') return 0
+  const dir = normalizeGoalDirection(input.goalDirection)
+  return dir === 'from_goal' ? -input.amount : input.amount
+}
+
+/**
+ * Efeito na conta corrente de uma transferência ligada a caixinha.
+ * to_goal: sai da conta; from_goal: entra na conta.
+ */
+export function goalTransferAccountDelta(input: {
+  type: string
+  amount: number
+  goalId: string | null | undefined
+  goalDirection?: GoalDirection | null
+}): number {
+  if (!input.goalId || input.type !== 'transfer') return 0
+  const dir = normalizeGoalDirection(input.goalDirection)
+  return dir === 'from_goal' ? input.amount : -input.amount
 }
 
 export async function applyGoalAmountDelta(
@@ -20,7 +47,6 @@ export async function applyGoalAmountDelta(
   if (!Number.isFinite(delta) || delta === 0) return { ok: true }
 
   if (delta < 0) {
-    // Atomic guard: never go negative even under concurrent updates
     const updated = await queryOne(
       `update ${T.goals}
        set current_amount = current_amount + $3

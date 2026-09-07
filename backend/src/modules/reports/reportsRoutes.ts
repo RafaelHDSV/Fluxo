@@ -75,6 +75,9 @@ router.get('/dashboard', async (req, res) => {
          when type = 'adjustment' then amount
          when type = 'expense' and paid = true
            and coalesce(payment_method, 'debit') <> 'credit' then -amount
+         when type = 'transfer' and goal_id is not null
+           and coalesce(goal_direction, 'to_goal') = 'from_goal' then amount
+         when type = 'transfer' and goal_id is not null then -amount
          else 0 end), 0) as sum
        from ${T.transactions}
        where user_id = $1 and date between $2::date and $3::date`,
@@ -88,11 +91,21 @@ router.get('/dashboard', async (req, res) => {
     closingBalance = Number.NaN
   }
 
-  const monthAgg = await queryOne<{ income: string; expense: string; adjustments: string }>(
+  const monthAgg = await queryOne<{
+    income: string
+    expense: string
+    adjustments: string
+    goal_transfers: string
+  }>(
     `select
       coalesce(sum(case when type = 'income' then amount else 0 end),0) as income,
       coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense,
-      coalesce(sum(case when type = 'adjustment' then amount else 0 end),0) as adjustments
+      coalesce(sum(case when type = 'adjustment' then amount else 0 end),0) as adjustments,
+      coalesce(sum(case
+        when type = 'transfer' and goal_id is not null
+          and coalesce(goal_direction, 'to_goal') = 'from_goal' then amount
+        when type = 'transfer' and goal_id is not null then -amount
+        else 0 end),0) as goal_transfers
      from ${T.transactions}
      where user_id = $1 and ${EFF} between $2 and $3`,
     [userId, from, to],
@@ -101,9 +114,10 @@ router.get('/dashboard', async (req, res) => {
   const income = toNumber(monthAgg?.income)
   const expense = toNumber(monthAgg?.expense)
   const adjustments = toNumber(monthAgg?.adjustments)
+  const goalTransfers = toNumber(monthAgg?.goal_transfers)
   const result = income - expense
   if (balancesFromAccounts || bounds.period === 'all') {
-    closingBalance = openingBalance + result + adjustments
+    closingBalance = openingBalance + result + adjustments + goalTransfers
   }
   const savingsRate = income > 0 ? (result / income) * 100 : 0
 
@@ -140,6 +154,9 @@ router.get('/dashboard', async (req, res) => {
            when type = 'income' then amount
            when type = 'expense' and paid = true then -amount
            when type = 'adjustment' then amount
+           when type = 'transfer' and goal_id is not null
+             and coalesce(goal_direction, 'to_goal') = 'from_goal' then amount
+           when type = 'transfer' and goal_id is not null then -amount
            else 0 end), 0) as daily
        from ${T.transactions}
        where user_id = $1 and ${EFF} between $2 and $3

@@ -2,7 +2,13 @@ import { Router } from 'express'
 import { applyAccountBalanceDelta, checkingCashDelta } from '../../lib/accountCash.js'
 import { computeCreditDueDate, effectiveDateSql } from '../../lib/creditCycle.js'
 import { query, queryOne } from '../../lib/db.js'
-import { applyGoalAmountDelta, goalAmountDelta } from '../../lib/goalCash.js'
+import {
+  applyGoalAmountDelta,
+  goalAmountDelta,
+  goalTransferAccountDelta,
+  normalizeGoalDirection,
+  type GoalDirection,
+} from '../../lib/goalCash.js'
 import { buildDedupeHash, toNumber } from '../../lib/money.js'
 import { T } from '../../lib/tables.js'
 import { requireAuth } from '../../middleware/auth.js'
@@ -26,27 +32,66 @@ function parsePaymentMethod(value: unknown): 'debit' | 'credit' | null | undefin
   return undefined
 }
 
-async function resolveGoalId(input: {
+async function resolveGoalLink(input: {
   userId: string
   goalId: unknown
   type: string
-  paymentMethod: string | null
-}): Promise<{ goal_id: string | null; error?: string }> {
-  if (input.goalId === undefined) return { goal_id: null } // caller decide keep-existing no PUT
-  if (input.goalId === null || input.goalId === '') return { goal_id: null }
-  if (typeof input.goalId !== 'string') return { goal_id: null, error: 'goal_id inválido' }
-  if (input.type !== 'expense' && input.type !== 'income') {
-    return { goal_id: null, error: 'goal_id só permitido em despesa ou receita' }
+  transferAccountId: unknown
+  goalDirection: unknown
+}): Promise<{ goal_id: string | null; goal_direction: GoalDirection | null; error?: string }> {
+  if (input.goalId === undefined) {
+    return { goal_id: null, goal_direction: null } // caller decide keep-existing no PUT
   }
-  if (input.type === 'expense' && input.paymentMethod === 'credit') {
-    return { goal_id: null, error: 'Despesa no crédito não pode vincular caixinha' }
+  if (input.goalId === null || input.goalId === '') {
+    return { goal_id: null, goal_direction: null }
+  }
+  if (typeof input.goalId !== 'string') {
+    return { goal_id: null, goal_direction: null, error: 'goal_id inválido' }
+  }
+  if (input.type !== 'transfer') {
+    return { goal_id: null, goal_direction: null, error: 'goal_id só permitido em transferência' }
+  }
+  if (input.transferAccountId) {
+    return {
+      goal_id: null,
+      goal_direction: null,
+      error: 'Transferência com caixinha não pode ter conta destino',
+    }
   }
   const goal = await queryOne(`select id from ${T.goals} where id = $1 and user_id = $2`, [
     input.goalId,
     input.userId,
   ])
-  if (!goal) return { goal_id: null, error: 'Caixinha não encontrada' }
-  return { goal_id: input.goalId }
+  if (!goal) return { goal_id: null, goal_direction: null, error: 'Caixinha não encontrada' }
+  return {
+    goal_id: input.goalId,
+    goal_direction: normalizeGoalDirection(input.goalDirection),
+  }
+}
+
+/** Caixa na conta: regras normais + transferência ↔ caixinha. */
+function accountCashDelta(input: {
+  type: string
+  amount: number
+  paid: boolean
+  paymentMethod: string | null | undefined
+  goalId: string | null | undefined
+  goalDirection?: GoalDirection | null
+}): number {
+  return (
+    checkingCashDelta({
+      type: input.type,
+      amount: input.amount,
+      paid: input.paid,
+      paymentMethod: input.paymentMethod,
+    }) +
+    goalTransferAccountDelta({
+      type: input.type,
+      amount: input.amount,
+      goalId: input.goalId,
+      goalDirection: input.goalDirection,
+    })
+  )
 }
 
 async function resolveDueDate(input: {
@@ -233,16 +278,21 @@ router.post('/', async (req, res) => {
 
   const paid = parsePaid(body.paid) ?? true
 
-  const goalResolved = await resolveGoalId({
+  const transferDest = transfer_account_id ?? null
+  const goalLink = await resolveGoalLink({
     userId: req.userId!,
     goalId: body.goal_id !== undefined ? body.goal_id : null,
     type: String(type),
-    paymentMethod: resolvedMethod,
+    transferAccountId: transferDest,
+    goalDirection: body.goal_direction,
   })
-  if (goalResolved.error) {
-    return res.status(400).json({ error: goalResolved.error })
+  if (goalLink.error) {
+    return res.status(400).json({ error: goalLink.error })
   }
-  const resolvedGoalId = goalResolved.goal_id
+  const resolvedGoalId = goalLink.goal_id
+  const resolvedGoalDirection = goalLink.goal_direction
+  // Transferência ↔ caixinha: sem conta destino
+  const finalTransferAccountId = resolvedGoalId ? null : transferDest
 
   const dedupe_hash = buildDedupeHash({
     userId: req.userId!,
@@ -254,9 +304,21 @@ router.post('/', async (req, res) => {
   })
 
   const amountNum = toNumber(amount)
-  const gDelta = goalAmountDelta({ type: String(type), amount: amountNum, goalId: resolvedGoalId })
+  const gDelta = goalAmountDelta({
+    type: String(type),
+    amount: amountNum,
+    goalId: resolvedGoalId,
+    goalDirection: resolvedGoalDirection,
+  })
+  const cashDelta = accountCashDelta({
+    type: String(type),
+    amount: amountNum,
+    paid,
+    paymentMethod: resolvedMethod,
+    goalId: resolvedGoalId,
+    goalDirection: resolvedGoalDirection,
+  })
 
-  // Prefer: checar saldo da caixinha antes do insert no resgate (income + goal)
   if (gDelta < 0 && resolvedGoalId) {
     const goalRow = await queryOne<{ current_amount: string }>(
       `select current_amount from ${T.goals} where id = $1 and user_id = $2`,
@@ -274,8 +336,8 @@ router.post('/', async (req, res) => {
     const row = await queryOne<{ id: string }>(
       `insert into ${T.transactions}
         (user_id, date, description, amount, type, category_id, account_id, transfer_account_id,
-         card_account_id, tags, notes, dedupe_hash, external_fitid, paid, payment_method, source_ref, due_date, goal_id)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+         card_account_id, tags, notes, dedupe_hash, external_fitid, paid, payment_method, source_ref, due_date, goal_id, goal_direction)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
        returning *, (${EFF})::text as effective_date`,
       [
         req.userId,
@@ -285,7 +347,7 @@ router.post('/', async (req, res) => {
         type,
         categoryId,
         account_id,
-        transfer_account_id ?? null,
+        finalTransferAccountId,
         dueResolved.card_account_id,
         tags,
         notes ?? null,
@@ -296,22 +358,15 @@ router.post('/', async (req, res) => {
         source_ref ?? null,
         dueResolved.due_date,
         resolvedGoalId,
+        resolvedGoalDirection,
       ],
     )
-    await applyAccountBalanceDelta(
-      req.userId!,
-      account_id,
-      checkingCashDelta({ type, amount: amountNum, paid, paymentMethod: resolvedMethod }),
-    )
+    await applyAccountBalanceDelta(req.userId!, account_id, cashDelta)
     if (gDelta !== 0 && resolvedGoalId && row) {
       const r = await applyGoalAmountDelta(req.userId!, resolvedGoalId, gDelta)
       if (!r.ok) {
         await queryOne(`delete from ${T.transactions} where id = $1 and user_id = $2`, [row.id, req.userId])
-        await applyAccountBalanceDelta(
-          req.userId!,
-          account_id,
-          -checkingCashDelta({ type, amount: amountNum, paid, paymentMethod: resolvedMethod }),
-        )
+        await applyAccountBalanceDelta(req.userId!, account_id, -cashDelta)
         return res.status(400).json({ error: r.error })
       }
     }
@@ -341,6 +396,8 @@ router.put('/:id', async (req, res) => {
     card_account_id: string | null
     due_date: string | null
     goal_id: string | null
+    goal_direction: string | null
+    transfer_account_id: string | null
   }>(`select * from ${T.transactions} where id = $1 and user_id = $2`, [req.params.id, req.userId])
 
   if (!existing) return res.status(404).json({ error: 'Transação não encontrada' })
@@ -362,19 +419,78 @@ router.put('/:id', async (req, res) => {
     payment_method = parsed
   }
 
-  // Toggle de `paid` é só status (A pagar) — não move saldo.
-  // Efeito de caixa usa o `paid` já persistido; criar já pago / valor / meio / conta sim.
-  const oldCash = checkingCashDelta({
+  const transferDest =
+    body.transfer_account_id !== undefined ? body.transfer_account_id : existing.transfer_account_id
+
+  // goal_id: undefined → manter existing; null/'' → limpar
+  const goalIdInput = body.goal_id !== undefined ? body.goal_id : existing.goal_id
+  const goalDirInput =
+    body.goal_direction !== undefined ? body.goal_direction : existing.goal_direction
+
+  let newGoalId: string | null = null
+  let newGoalDirection: GoalDirection | null = null
+  if (type !== 'transfer') {
+    newGoalId = null
+    newGoalDirection = null
+  } else if (goalIdInput) {
+    // Caixinha e conta destino são mutuamente exclusivas — limpa destino ao vincular
+    const goalLink = await resolveGoalLink({
+      userId: req.userId!,
+      goalId: goalIdInput,
+      type,
+      transferAccountId: null,
+      goalDirection: goalDirInput,
+    })
+    if (goalLink.error) {
+      return res.status(400).json({ error: goalLink.error })
+    }
+    newGoalId = goalLink.goal_id
+    newGoalDirection = goalLink.goal_direction
+  }
+
+  if (body.goal_id && body.transfer_account_id !== undefined && body.transfer_account_id) {
+    return res.status(400).json({
+      error: 'Transferência com caixinha não pode ter conta destino',
+    })
+  }
+
+  const finalTransferAccountId = newGoalId
+    ? null
+    : transferDest
+      ? String(transferDest)
+      : null
+
+  const oldGoalDirection = existing.goal_id
+    ? normalizeGoalDirection(existing.goal_direction)
+    : null
+  const oldGoalDelta = goalAmountDelta({
+    type: existing.type,
+    amount: toNumber(existing.amount),
+    goalId: existing.goal_id,
+    goalDirection: oldGoalDirection,
+  })
+  const newGoalDelta = goalAmountDelta({
+    type,
+    amount,
+    goalId: newGoalId,
+    goalDirection: newGoalDirection,
+  })
+
+  const oldCash = accountCashDelta({
     type: existing.type,
     amount: toNumber(existing.amount),
     paid: existing.paid,
     paymentMethod: existing.payment_method,
+    goalId: existing.goal_id,
+    goalDirection: oldGoalDirection,
   })
-  const newCash = checkingCashDelta({
+  const newCash = accountCashDelta({
     type,
     amount,
     paid: existing.paid,
     paymentMethod: payment_method,
+    goalId: newGoalId,
+    goalDirection: newGoalDirection,
   })
 
   const cardAccountId =
@@ -422,31 +538,7 @@ router.put('/:id', async (req, res) => {
 
   const source_ref = body.source_ref !== undefined ? body.source_ref : existing.source_ref
 
-  // goal_id: undefined → manter existing (revalidando tipo/meio); null/'' → limpar
-  const goalIdInput = body.goal_id !== undefined ? body.goal_id : existing.goal_id
-  let newGoalId: string | null = null
-  if (goalIdInput) {
-    const goalResolved = await resolveGoalId({
-      userId: req.userId!,
-      goalId: goalIdInput,
-      type,
-      paymentMethod: payment_method,
-    })
-    if (goalResolved.error) {
-      return res.status(400).json({ error: goalResolved.error })
-    }
-    newGoalId = goalResolved.goal_id
-  }
-
-  const oldGoalDelta = goalAmountDelta({
-    type: existing.type,
-    amount: toNumber(existing.amount),
-    goalId: existing.goal_id,
-  })
-  const newGoalDelta = goalAmountDelta({ type, amount, goalId: newGoalId })
-
-  // Pre-validate reverse of old goal effect (expense aporte → negative reverse) before UPDATE
-  // so we never commit the row then fail with 400 and leave caixinha drift.
+  // Pre-validate reverse of old goal effect before UPDATE
   if (existing.goal_id && oldGoalDelta > 0) {
     const oldGoalRow = await queryOne<{ current_amount: string }>(
       `select current_amount from ${T.goals} where id = $1 and user_id = $2`,
@@ -500,7 +592,7 @@ router.put('/:id', async (req, res) => {
         type = coalesce($6, type),
         category_id = coalesce($7, category_id),
         account_id = $8,
-        transfer_account_id = coalesce($9, transfer_account_id),
+        transfer_account_id = $9,
         card_account_id = $10,
         tags = coalesce($11, tags),
         notes = coalesce($12, notes),
@@ -511,6 +603,7 @@ router.put('/:id', async (req, res) => {
         source_ref = $17,
         due_date = $18,
         goal_id = $19,
+        goal_direction = $20,
         updated_at = now()
        where id = $1 and user_id = $2
        returning *, (${EFF})::text as effective_date`,
@@ -523,7 +616,7 @@ router.put('/:id', async (req, res) => {
         type,
         body.category_id ?? null,
         account_id,
-        body.transfer_account_id ?? null,
+        finalTransferAccountId,
         finalCard,
         body.tags ?? null,
         body.notes ?? null,
@@ -534,6 +627,7 @@ router.put('/:id', async (req, res) => {
         source_ref ?? null,
         finalDue,
         newGoalId,
+        newGoalDirection,
       ],
     )
   } catch (error: unknown) {
@@ -582,16 +676,28 @@ router.delete('/:id', async (req, res) => {
     payment_method: string | null
     account_id: string
     goal_id: string | null
+    goal_direction: string | null
   }>(
-    `select id, type, amount, paid, payment_method, account_id, goal_id from ${T.transactions} where id = $1 and user_id = $2`,
+    `select id, type, amount, paid, payment_method, account_id, goal_id, goal_direction
+     from ${T.transactions} where id = $1 and user_id = $2`,
     [req.params.id, req.userId],
   )
   if (!existing) return res.status(404).json({ error: 'Transação não encontrada' })
 
+  const goalDir = existing.goal_id ? normalizeGoalDirection(existing.goal_direction) : null
   const gDelta = goalAmountDelta({
     type: existing.type,
     amount: toNumber(existing.amount),
     goalId: existing.goal_id,
+    goalDirection: goalDir,
+  })
+  const cashDelta = accountCashDelta({
+    type: existing.type,
+    amount: toNumber(existing.amount),
+    paid: existing.paid,
+    paymentMethod: existing.payment_method,
+    goalId: existing.goal_id,
+    goalDirection: goalDir,
   })
 
   // Reverse caixinha BEFORE delete/account restore — avoids double money if reverse fails
@@ -620,16 +726,7 @@ router.delete('/:id', async (req, res) => {
     req.params.id,
     req.userId,
   ])
-  await applyAccountBalanceDelta(
-    req.userId!,
-    existing.account_id,
-    -checkingCashDelta({
-      type: existing.type,
-      amount: toNumber(existing.amount),
-      paid: existing.paid,
-      paymentMethod: existing.payment_method,
-    }),
-  )
+  await applyAccountBalanceDelta(req.userId!, existing.account_id, -cashDelta)
   res.status(204).send()
 })
 
@@ -650,18 +747,21 @@ router.post('/bulk-delete', async (req, res) => {
     payment_method: string | null
     account_id: string
     goal_id: string | null
+    goal_direction: string | null
   }>(
-    `select id, type, amount, paid, payment_method, account_id, goal_id from ${T.transactions}
+    `select id, type, amount, paid, payment_method, account_id, goal_id, goal_direction from ${T.transactions}
      where user_id = $1 and id = any($2::uuid[])`,
     [req.userId, cleaned],
   )
 
   // Pre-check + reverse caixinhas BEFORE delete/account restore
   for (const row of existing) {
+    const goalDir = row.goal_id ? normalizeGoalDirection(row.goal_direction) : null
     const gDelta = goalAmountDelta({
       type: row.type,
       amount: toNumber(row.amount),
       goalId: row.goal_id,
+      goalDirection: goalDir,
     })
     if (gDelta === 0 || !row.goal_id) continue
 
@@ -692,14 +792,17 @@ router.post('/bulk-delete', async (req, res) => {
     [req.userId, cleaned],
   )
   for (const row of existing) {
+    const goalDir = row.goal_id ? normalizeGoalDirection(row.goal_direction) : null
     await applyAccountBalanceDelta(
       req.userId!,
       row.account_id,
-      -checkingCashDelta({
+      -accountCashDelta({
         type: row.type,
         amount: toNumber(row.amount),
         paid: row.paid,
         paymentMethod: row.payment_method,
+        goalId: row.goal_id,
+        goalDirection: goalDir,
       }),
     )
   }

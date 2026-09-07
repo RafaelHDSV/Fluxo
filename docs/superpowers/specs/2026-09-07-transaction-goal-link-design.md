@@ -1,103 +1,38 @@
-# Spec: vínculo transação ↔ caixinha (investimento)
+# Design: vínculo transação ↔ caixinha
 
-**Data:** 2026-09-07  
-**Status:** implementado  
-**Abordagem:** `goal_id` na transação (despesa = aporte, receita = resgate)
+**Data:** 2026-09-07 (remodelado: transferência)
 
-## Objetivo
+**Abordagem:** `goal_id` + `goal_direction` em **transferência** (`to_goal` = aporte, `from_goal` = resgate). Não usa despesa/receita — assim o movimento não infla Despesas nem reduz “saldo do mês” como gasto.
 
-Permitir que um lançamento no Santander (manual ou OFX) seja vinculado a uma **caixinha** (`fluxo_goals`), atualizando `current_amount` automaticamente.
-
-Fluxo mental do usuário: origem conta corrente ↔ destino/origem investimento, sem baixar o saldo do banco **duas vezes** quando o extrato OFX já refletiu a aplicação/resgate.
-
-## Decisões fechadas
+## Decisões
 
 | Tema | Decisão |
-|------|----------|
-| Saldos no aporte/resgate manual | Conta **e** caixinha se movem (criar despesa/receita já com efeito de caixa atual) |
-| OFX | A linha do extrato **é** o movimento; vincular `goal_id` depois só move a caixinha |
-| Resgate | Sim, no mesmo modelo (`income` + `goal_id`) |
-| Marcar pago | Continua **sem** alterar saldo da conta (regra vigente) |
-| Caixinha sobe/desce | Ao salvar com `goal_id`, **independente** de `paid` |
-| Resgate > saldo da caixinha | **Bloquear** (400) |
-| Aporte via UI Investimentos | Fora: o aporte é a transação |
+|------|--------|
+| Tipo | Somente `type = transfer` |
+| Destino | Caixinha **ou** conta destino — mutuamente exclusivos |
+| Direção | `to_goal` (conta → caixinha) / `from_goal` (caixinha → conta) |
+| Conta corrente | Move saldo (± amount conforme direção) |
+| Caixinha | `current_amount` ± amount conforme direção |
+| Despesas / receitas | Sem `goal_id` (API rejeita) |
+| Relatórios | Transferência com caixinha entra no caixa (opening/closing/cashflow); **não** em income/expense |
+| OFX | Linha do extrato pode ser convertida para transferência + caixinha |
 
-## Modelo de dados
+## Schema
 
-Migration `009_transaction_goal_id.sql`:
-
-```sql
-alter table public.fluxo_transactions
-  add column if not exists goal_id uuid references public.fluxo_goals (id) on delete set null;
-
-create index if not exists fluxo_transactions_user_goal_idx
-  on public.fluxo_transactions (user_id, goal_id)
-  where goal_id is not null;
-```
-
-`fluxo_goals.current_amount` permanece coluna materializada, atualizada no write path das transações (não recalcular a tela só por soma em todo GET).
-
-## Semântica
-
-| `type` | Conta | `goal_id` | Conta corrente | Caixinha |
-|--------|-------|-----------|----------------|----------|
-| `expense` (não crédito) | Santander (etc.) | caixinha X | regras de caixa atuais (débito pago na criação, etc.) | **+** amount |
-| `income` | Santander (etc.) | caixinha X | regras de caixa atuais | **−** amount |
-| `transfer` / `adjustment` / despesa crédito | — | — | — | **proibido** (`goal_id` → 400) |
-
-**Update:** reverte efeito antigo na caixinha (se havia `goal_id`/valor/tipo) e aplica o novo.  
-**Delete:** reverte efeito na caixinha; `on delete set null` se a caixinha for apagada (não recoloca dinheiro na conta).  
-**PUT só `goal_id` em despesa já existente (OFX):** apenas ± caixinha; não reaplica delta de conta além das regras normais de update (toggle paid continua sem mexer saldo).
+- `009_transaction_goal_id.sql` — `goal_id`
+- `010_goal_direction.sql` — `goal_direction` (`to_goal` \| `from_goal`)
 
 ## API
 
-`POST/PUT /api/transactions`:
+- Body: `goal_id`, `goal_direction` (default `to_goal` se houver goal)
+- `transfer_account_id` e `goal_id` juntos → 400
+- Listagem: `goal_id`, `goal_direction`, `goal_name`
 
-- Body opcional: `goal_id: uuid | null`
-- Validar goal do mesmo `user_id`
-- Só `expense` | `income`
-- Despesa com `payment_method = 'credit'` **não** pode ter `goal_id` (aporte/resgate é movimento de conta corrente / OFX)
-- Resgate: se `current_amount < amount` (após reverter efeito antigo no update) → 400
-- Helper: `applyGoalAmountDelta(userId, goalId, delta)`
+## UI (Transações)
 
-Listagem: retornar `goal_id` e `goal_name` (join no BFF) para a UI.
-
-## UI
-
-**Transações**
-
-- Select **Caixinha** se tipo = despesa ou receita (opção “Nenhuma”)
-- Coluna/badge com nome da caixinha na lista
-- Editar lançamento OFX → escolher caixinha e salvar
-
-**Investimentos**
-
-- Continua exibindo `current_amount` (alimentado pelas txs)
-- Sem “adicionar valor” manual neste escopo
-
-## Edge cases
-
-- Goal de outro usuário / inexistente → 404/400
-- Trocar `expense`↔`income` com `goal_id` → reverte e reaplica
-- Delete da caixinha → txs ficam com `goal_id` null; histórico de conta intacto
-- Histórico pré-feature: `current_amount` atual das caixinhas **não** é recalculado em massa neste MVP (opcional script one-shot fora do escopo)
-
-## Testes
-
-- Create expense + goal → `current_amount` sobe
-- Create income + goal → desce; insuficiente → 400
-- Update amount / trocar goal / clear goal → deltas corretos
-- Delete → reverte caixinha
-- `goal_id` em transfer → 400
-
-## Docs
-
-Atualizar `docs/context.md`: investimentos ligados a transações via `goal_id`.
+- Tipo **Transferência**: select Caixinha + Direção; Conta destino só se sem caixinha
 
 ## Fora de escopo
 
-- Auto-detectar caixinha na importação OFX
-- Transfer conta↔conta misturada com goal
-- Conta `type = investment` espelhando cada caixinha
-- UI de aporte direto na página Investimentos
-- Recalcular `current_amount` histórico em lote
+- UI de aporte direto em Investimentos
+- Backfill de despesas antigas “Reserva…” → transfer

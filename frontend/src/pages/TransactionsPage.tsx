@@ -61,6 +61,7 @@ type Tx = {
   paid: boolean
   payment_method: 'debit' | 'credit' | null
   goal_id?: string | null
+  goal_direction?: 'to_goal' | 'from_goal' | null
   goal_name?: string | null
 }
 
@@ -82,6 +83,7 @@ const emptyForm = {
   paid: false,
   payment_method: 'debit' as '' | 'debit' | 'credit',
   goal_id: '',
+  goal_direction: 'to_goal' as 'to_goal' | 'from_goal',
 }
 
 function monthKey(date: string) {
@@ -163,8 +165,7 @@ export function TransactionsPage() {
   const isIncomeOnly = type === 'income'
   const isExpenseForm = form.type === 'expense'
   const isCreditForm = isExpenseForm && form.payment_method === 'credit'
-  const showGoalSelect =
-    (form.type === 'expense' || form.type === 'income') && form.payment_method !== 'credit'
+  const showGoalSelect = form.type === 'transfer'
   const showMeioColumn = !isIncomeOnly
   const tableColSpan = colSpanFor(showMeioColumn, isIncomeOnly)
 
@@ -302,8 +303,8 @@ export function TransactionsPage() {
       type: urlType,
       paid: urlType === 'income' ? true : f.type === urlType ? f.paid : false,
       payment_method: urlType === 'expense' ? f.payment_method || 'debit' : '',
-      goal_id:
-        urlType === 'transfer' || urlType === 'adjustment' ? '' : f.goal_id,
+      goal_id: urlType === 'transfer' ? f.goal_id : '',
+      goal_direction: urlType === 'transfer' ? f.goal_direction : 'to_goal',
     }))
   }, [searchParams, editingId])
 
@@ -330,6 +331,8 @@ export function TransactionsPage() {
       transfer_account_id: base.transfer_account_id,
       paid: base.type === 'income' ? true : false,
       payment_method: base.payment_method,
+      goal_id: base.type === 'transfer' ? base.goal_id : '',
+      goal_direction: base.goal_direction,
     }
   }
 
@@ -342,8 +345,7 @@ export function TransactionsPage() {
     e.preventDefault()
     setError('')
     try {
-      const canLinkGoal =
-        (form.type === 'expense' || form.type === 'income') && form.payment_method !== 'credit'
+      const canLinkGoal = form.type === 'transfer' && Boolean(form.goal_id)
       const payload = {
         date: form.date,
         description: form.description,
@@ -356,9 +358,12 @@ export function TransactionsPage() {
         card_account_id: isCreditForm && form.card_account_id ? form.card_account_id : null,
         due_date: isCreditForm && form.due_date ? form.due_date : null,
         transfer_account_id:
-          form.type === 'transfer' && form.transfer_account_id ? form.transfer_account_id : null,
+          form.type === 'transfer' && !canLinkGoal && form.transfer_account_id
+            ? form.transfer_account_id
+            : null,
         notes: form.type === 'adjustment' && form.notes ? form.notes : null,
-        goal_id: canLinkGoal ? form.goal_id || null : null,
+        goal_id: canLinkGoal ? form.goal_id : null,
+        goal_direction: canLinkGoal ? form.goal_direction || 'to_goal' : null,
       }
       if (editingId) await api.put(`/api/transactions/${editingId}`, payload)
       else await api.post('/api/transactions', payload)
@@ -483,6 +488,7 @@ export function TransactionsPage() {
       paid: Boolean(tx.paid),
       payment_method: tx.payment_method || 'debit',
       goal_id: tx.goal_id || '',
+      goal_direction: tx.goal_direction === 'from_goal' ? 'from_goal' : 'to_goal',
     })
     requestAnimationFrame(() => {
       formCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -578,8 +584,9 @@ export function TransactionsPage() {
                       type: v,
                       paid: v === 'income' ? true : false,
                       payment_method: v === 'expense' ? form.payment_method || 'debit' : '',
-                      goal_id:
-                        v === 'transfer' || v === 'adjustment' ? '' : form.goal_id,
+                      goal_id: v === 'transfer' ? form.goal_id : '',
+                      goal_direction: v === 'transfer' ? form.goal_direction : 'to_goal',
+                      transfer_account_id: v === 'transfer' ? form.transfer_account_id : '',
                     })
                   }
                 >
@@ -670,17 +677,24 @@ export function TransactionsPage() {
                   </div>
                 </>
               )}
-              {form.type === 'transfer' && (
+              {form.type === 'transfer' && !form.goal_id && (
                 <div className="space-y-2">
                   <Label>Conta destino</Label>
                   <Select
-                    value={form.transfer_account_id}
-                    onValueChange={(v) => setForm({ ...form, transfer_account_id: v })}
+                    value={form.transfer_account_id || '__none__'}
+                    onValueChange={(v) =>
+                      setForm({
+                        ...form,
+                        transfer_account_id: v === '__none__' ? '' : v,
+                        goal_id: '',
+                      })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="__none__">Nenhuma</SelectItem>
                       {accounts
                         .filter((a) => a.id !== form.account_id)
                         .map((a) => (
@@ -740,25 +754,58 @@ export function TransactionsPage() {
                 </Select>
               </div>
               {showGoalSelect && (
-                <div className="space-y-2">
-                  <Label>Caixinha</Label>
-                  <Select
-                    value={form.goal_id || '__none__'}
-                    onValueChange={(v) => setForm({ ...form, goal_id: v === '__none__' ? '' : v })}
-                  >
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Nenhuma" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Nenhuma</SelectItem>
-                      {goals.map((g) => (
-                        <SelectItem key={g.id} value={g.id}>
-                          {g.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label>Caixinha</Label>
+                    <Select
+                      value={form.goal_id || '__none__'}
+                      onValueChange={(v) =>
+                        setForm({
+                          ...form,
+                          goal_id: v === '__none__' ? '' : v,
+                          transfer_account_id: v === '__none__' ? form.transfer_account_id : '',
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Nenhuma" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Nenhuma</SelectItem>
+                        {goals.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Aporte ou resgate: conta ↔ caixinha (não conta como despesa).
+                    </p>
+                  </div>
+                  {form.goal_id ? (
+                    <div className="space-y-2">
+                      <Label>Direção</Label>
+                      <Select
+                        value={form.goal_direction}
+                        onValueChange={(v) =>
+                          setForm({
+                            ...form,
+                            goal_direction: v as 'to_goal' | 'from_goal',
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="to_goal">Para caixinha (aporte)</SelectItem>
+                          <SelectItem value="from_goal">Da caixinha (resgate)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
+                </>
               )}
               {isExpenseForm && (
                 <div className="flex items-end gap-2 pb-2">

@@ -50,9 +50,9 @@ Envs: `frontend/.env` e `backend/.env` a partir dos `.env.example`. Migrations e
 5. Tailwind + shadcn com tema dark/light
 6. **Entrada de dados mensal:** OFX da conta Santander (Money 2000+); CSV/OFX genérico também
 7. Orçamentos = categorias + metas de gasto; **regras de rename/categoria ficam em Importações**
-8. Investimentos = ex-Metas (`fluxo_goals`) — caixinhas com progresso; aporte/resgate via transação com `goal_id` (despesa/receita)
+8. Investimentos = ex-Metas (`fluxo_goals`) — caixinhas com progresso; aporte/resgate via **transferência** com `goal_id` + `goal_direction` (`to_goal` / `from_goal`) — **não** conta como despesa/receita
 9. Notion foi carga inicial histórica; **não é fonte operacional**
-10. **Saldo das contas** é a âncora (editável; OFX via `LEDGERBAL`). Criar receita/ajuste ou despesa **já paga** no débito ajusta o saldo; **marcar/desmarcar pago é só status** (A pagar) e **não** baixa de novo — evita duplicar após importar o extrato. Saldo inicial do mês = saldo atual − movimento de caixa do mês (`date`, despesa débito paga; sem crédito) — **não** a soma histórica do Notion
+10. **Saldo das contas** é a âncora (editável; OFX via `LEDGERBAL`). Criar receita/ajuste ou despesa **já paga** no débito ajusta o saldo; transferência ↔ caixinha também move a conta; **marcar/desmarcar pago é só status** (A pagar) e **não** baixa de novo — evita duplicar após importar o extrato. Saldo inicial do mês = saldo atual − movimento de caixa do mês (`date`, despesa débito paga + transferências de caixinha; sem crédito) — **não** a soma histórica do Notion
 11. Importação: preview aplica regras de rename → categoria; **stepper** revisa descrição/categoria das linhas novas antes do commit
 12. **Crédito:** `date` = data da compra; `due_date` = vencimento da fatura (ciclo `closing_day` + `due_day` do cartão). Resultado, orçamentos e filtros de período usam a data efetiva (`coalesce` do vencimento no crédito). Histórico antigo sem `due_date` continua em `date`
 13. **Shell:** sidebar em `lg+`; mobile com nav inferior + sheet “Mais”; `viewport-fit=cover` e safe-area
@@ -93,6 +93,7 @@ Dashboard · Transações · A pagar · Importações · Contas · Orçamentos �
 | `007_goals_optional_target.sql` | Meta opcional em investimentos |
 | `008_import_ledger_balance.sql` | LEDGERBAL do OFX persistido no preview → commit |
 | `009_transaction_goal_id.sql` | `goal_id` em transações → caixinha |
+| `010_goal_direction.sql` | `goal_direction` (`to_goal` / `from_goal`) na transferência ↔ caixinha |
 
 ---
 
