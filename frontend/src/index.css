@@ -118,4 +118,15 @@
   .font-mono {
     font-family: var(--font-mono);
   }
+
+  /* Buy Me a Coffee — acima da nav inferior no mobile */
+  #bmc-wbtn {
+    z-index: 45 !important;
+  }
+
+  @media (max-width: 1023px) {
+    #bmc-wbtn {
+      bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
+    }
+  }
 }
