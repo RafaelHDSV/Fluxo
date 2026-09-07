@@ -26,26 +26,45 @@ router.post('/', async (req, res) => {
 })
 
 router.put('/:id', async (req, res) => {
-  const { name, target_amount, current_amount, deadline, account_id } = req.body ?? {}
+  const body = req.body ?? {}
+  const { name, target_amount, current_amount, deadline, account_id } = body
+  if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
+    return res.status(400).json({ error: 'name é obrigatório' })
+  }
+
+  const existing = await queryOne<{ id: string }>(
+    `select id from ${T.goals} where id = $1 and user_id = $2`,
+    [req.params.id, req.userId],
+  )
+  if (!existing) return res.status(404).json({ error: 'Caixinha não encontrada' })
+
   const row = await queryOne(
     `update ${T.goals} set
       name = coalesce($3, name),
       target_amount = coalesce($4, target_amount),
       current_amount = coalesce($5, current_amount),
-      deadline = coalesce($6, deadline),
-      account_id = coalesce($7, account_id)
+      deadline = case when $6::boolean then $7::date else deadline end,
+      account_id = case when $8::boolean then $9::uuid else account_id end
      where id = $1 and user_id = $2 returning *`,
     [
       req.params.id,
       req.userId,
-      name ?? null,
-      target_amount ?? null,
-      current_amount ?? null,
-      deadline ?? null,
-      account_id ?? null,
+      name != null && String(name).trim() ? String(name).trim() : null,
+      target_amount !== undefined && target_amount !== null && target_amount !== ''
+        ? Number(target_amount)
+        : target_amount === '' || target_amount === null
+          ? 0
+          : null,
+      current_amount !== undefined && current_amount !== null && current_amount !== ''
+        ? Number(current_amount)
+        : null,
+      body.deadline !== undefined,
+      body.deadline ? String(body.deadline).slice(0, 10) : null,
+      body.account_id !== undefined,
+      body.account_id || null,
     ],
   )
-  if (!row) return res.status(404).json({ error: 'Meta não encontrada' })
+  if (!row) return res.status(404).json({ error: 'Caixinha não encontrada' })
   res.json(row)
 })
 

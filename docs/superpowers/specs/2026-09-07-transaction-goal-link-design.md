@@ -2,7 +2,7 @@
 
 **Data:** 2026-09-07 (remodelado: transferência)
 
-**Abordagem:** `goal_id` + `goal_direction` em **transferência** (`to_goal` = aporte, `from_goal` = resgate). Não usa despesa/receita — assim o movimento não infla Despesas nem reduz “saldo do mês” como gasto.
+**Abordagem:** `goal_id` + `goal_direction` em **transferência** (`to_goal` = aporte, `from_goal` = resgate). Não usa despesa/receita — assim o movimento não infla Despesas; o **Saldo do mês** do dashboard cai no aporte e sobe no resgate.
 
 ## Decisões
 
@@ -14,7 +14,8 @@
 | Conta corrente | Move saldo (± amount conforme direção) |
 | Caixinha | `current_amount` ± amount conforme direção |
 | Despesas / receitas | Sem `goal_id` (API rejeita) |
-| Relatórios | Transferência com caixinha entra no caixa (opening/closing/cashflow); **não** em income/expense |
+| Relatórios | Transferência com caixinha **não** entra em income/expense; entra no **Saldo do mês** (aporte negativo) e no cashflow |
+| CRUD caixinha | Investimentos: criar, editar e excluir direto |
 | OFX | Linha do extrato pode ser convertida para transferência + caixinha |
 
 ## Schema

@@ -115,9 +115,10 @@ router.get('/dashboard', async (req, res) => {
   const expense = toNumber(monthAgg?.expense)
   const adjustments = toNumber(monthAgg?.adjustments)
   const goalTransfers = toNumber(monthAgg?.goal_transfers)
-  const result = income - expense
+  // Aporte (to_goal) reduz o resultado; resgate aumenta — sem misturar com Despesas
+  const result = income - expense + goalTransfers
   if (balancesFromAccounts || bounds.period === 'all') {
-    closingBalance = openingBalance + result + adjustments + goalTransfers
+    closingBalance = openingBalance + result + adjustments
   }
   const savingsRate = income > 0 ? (result / income) * 100 : 0
 
@@ -251,6 +252,7 @@ router.get('/dashboard', async (req, res) => {
     income,
     expense,
     adjustments,
+    goalTransfers,
     result,
     savingsRate,
     previousIncome,

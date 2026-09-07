@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Button } from '@/components/ui/button'
@@ -19,14 +19,17 @@ type Goal = {
   deadline?: string | null
 }
 
+const emptyForm = {
+  name: '',
+  target_amount: '',
+  current_amount: '0',
+  deadline: '',
+}
+
 export function InvestmentsPage() {
   const [goals, setGoals] = useState<Goal[]>([])
-  const [form, setForm] = useState({
-    name: '',
-    target_amount: '',
-    current_amount: '0',
-    deadline: '',
-  })
+  const [form, setForm] = useState(emptyForm)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -53,16 +56,38 @@ export function InvestmentsPage() {
     load()
   }, [])
 
+  function cancelEdit() {
+    setEditingId(null)
+    setForm(emptyForm)
+  }
+
+  function startEdit(g: Goal) {
+    setEditingId(g.id)
+    setForm({
+      name: g.name,
+      target_amount: Number(g.target_amount) > 0 ? String(g.target_amount) : '',
+      current_amount: String(g.current_amount ?? 0),
+      deadline: g.deadline ? String(g.deadline).slice(0, 10) : '',
+    })
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    await api.post('/api/goals', {
-      name: form.name,
-      target_amount: form.target_amount === '' ? 0 : Number(form.target_amount),
-      current_amount: Number(form.current_amount || 0),
-      deadline: form.deadline || null,
-    })
-    setForm({ name: '', target_amount: '', current_amount: '0', deadline: '' })
-    await load()
+    setError('')
+    try {
+      const payload = {
+        name: form.name,
+        target_amount: form.target_amount === '' ? 0 : Number(form.target_amount),
+        current_amount: Number(form.current_amount || 0),
+        deadline: form.deadline || null,
+      }
+      if (editingId) await api.put(`/api/goals/${editingId}`, payload)
+      else await api.post('/api/goals', payload)
+      cancelEdit()
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao salvar')
+    }
   }
 
   async function confirmDelete() {
@@ -70,6 +95,7 @@ export function InvestmentsPage() {
     setDeleting(true)
     try {
       await api.delete(`/api/goals/${deleteId}`)
+      if (editingId === deleteId) cancelEdit()
       setDeleteId(null)
       await load()
     } catch (e) {
@@ -92,7 +118,7 @@ export function InvestmentsPage() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Nova caixinha</CardTitle>
+          <CardTitle className="text-base">{editingId ? 'Editar caixinha' : 'Nova caixinha'}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -133,10 +159,15 @@ export function InvestmentsPage() {
               <Label>Prazo (opcional)</Label>
               <DatePicker value={form.deadline} onChange={(deadline) => setForm({ ...form, deadline })} />
             </div>
-            <div className="flex items-end">
+            <div className="flex flex-wrap items-end gap-2">
               <Button type="submit" className="h-10">
-                Criar caixinha
+                {editingId ? 'Atualizar' : 'Criar caixinha'}
               </Button>
+              {editingId && (
+                <Button type="button" variant="outline" className="h-10" onClick={cancelEdit}>
+                  Cancelar
+                </Button>
+              )}
             </div>
           </form>
         </CardContent>
@@ -190,6 +221,15 @@ export function InvestmentsPage() {
                             formatBRL(current)
                           )}
                         </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          type="button"
+                          aria-label="Editar"
+                          onClick={() => startEdit(g)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

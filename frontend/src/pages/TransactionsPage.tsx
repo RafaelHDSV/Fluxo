@@ -780,7 +780,7 @@ export function TransactionsPage() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Aporte ou resgate: conta ↔ caixinha (não conta como despesa).
+                      Aporte reduz o saldo do mês; resgate aumenta — sem entrar em Despesas.
                     </p>
                   </div>
                   {form.goal_id ? (

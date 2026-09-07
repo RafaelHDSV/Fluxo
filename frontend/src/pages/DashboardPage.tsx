@@ -29,6 +29,7 @@ type Dashboard = {
   income: number
   expense: number
   adjustments?: number
+  goalTransfers?: number
   result: number
   savingsRate: number
   previousIncome?: number
@@ -92,8 +93,10 @@ export function DashboardPage() {
   const unpaidCount = data?.unpaidCount ?? 0
   const carryIn =
     data?.openingBalance != null && Number.isFinite(data.openingBalance) ? data.openingBalance : 0
+  const goalTransfers = data?.goalTransfers ?? 0
   const receitasTotais = data ? data.income + carryIn : 0
-  const saldoMes = data ? receitasTotais - data.expense : 0
+  // Aportes em caixinha (goalTransfers < 0) reduzem o saldo do mês; resgates aumentam
+  const saldoMes = data ? receitasTotais - data.expense + goalTransfers : 0
   const projectedAfterPayables = saldoMes - unpaidTotal
   const showCarryIn = periodMode !== 'all'
 
@@ -204,7 +207,11 @@ export function DashboardPage() {
               label="Saldo do mês"
               value={formatBRL(saldoMes)}
               tone={saldoMes >= 0 ? 'positive' : 'negative'}
-              hint="Receitas − despesas pagas"
+              hint={
+                goalTransfers !== 0
+                  ? `Receitas − despesas${goalTransfers < 0 ? ` − aportes (${formatBRL(Math.abs(goalTransfers))})` : ` + resgates (${formatBRL(goalTransfers)})`}`
+                  : 'Receitas − despesas pagas'
+              }
             />
             <SummaryCard
               label="Ainda a pagar"
