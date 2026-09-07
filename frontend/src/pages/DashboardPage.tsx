@@ -28,6 +28,7 @@ type Dashboard = {
   balancesAnchored?: boolean
   income: number
   expense: number
+  debitExpense?: number
   adjustments?: number
   goalTransfers?: number
   result: number
@@ -94,9 +95,10 @@ export function DashboardPage() {
   const carryIn =
     data?.openingBalance != null && Number.isFinite(data.openingBalance) ? data.openingBalance : 0
   const goalTransfers = data?.goalTransfers ?? 0
+  const debitExpense = data?.debitExpense ?? data?.expense ?? 0
   const receitasTotais = data ? data.income + carryIn : 0
-  // Aportes em caixinha (goalTransfers < 0) reduzem o saldo do mês; resgates aumentam
-  const saldoMes = data ? receitasTotais - data.expense + goalTransfers : 0
+  // Caixa da corrente: não abate cartão; aportes (goalTransfers < 0) reduzem
+  const saldoMes = data ? receitasTotais - debitExpense + goalTransfers : 0
   const projectedAfterPayables = saldoMes - unpaidTotal
   const showCarryIn = periodMode !== 'all'
 
@@ -201,7 +203,7 @@ export function DashboardPage() {
               label="Despesas"
               value={formatBRL(data.expense)}
               tone="negative"
-              hint="Já pagas no período"
+              hint="Já pagas no período (inclui cartão)"
             />
             <SummaryCard
               label="Saldo do mês"
@@ -209,8 +211,8 @@ export function DashboardPage() {
               tone={saldoMes >= 0 ? 'positive' : 'negative'}
               hint={
                 goalTransfers !== 0
-                  ? `Receitas − despesas${goalTransfers < 0 ? ` − aportes (${formatBRL(Math.abs(goalTransfers))})` : ` + resgates (${formatBRL(goalTransfers)})`}`
-                  : 'Receitas − despesas pagas'
+                  ? `Caixa da conta − aportes${goalTransfers < 0 ? ` (${formatBRL(Math.abs(goalTransfers))})` : ` + resgates (${formatBRL(goalTransfers)})`} · sem cartão`
+                  : 'Receitas − débitos pagos (sem cartão)'
               }
             />
             <SummaryCard

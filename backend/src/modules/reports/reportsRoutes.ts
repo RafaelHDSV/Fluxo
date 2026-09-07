@@ -94,12 +94,17 @@ router.get('/dashboard', async (req, res) => {
   const monthAgg = await queryOne<{
     income: string
     expense: string
+    debit_expense: string
     adjustments: string
     goal_transfers: string
   }>(
     `select
       coalesce(sum(case when type = 'income' then amount else 0 end),0) as income,
       coalesce(sum(case when type = 'expense' and paid = true then amount else 0 end),0) as expense,
+      coalesce(sum(case
+        when type = 'expense' and paid = true
+          and coalesce(payment_method, 'debit') <> 'credit' then amount
+        else 0 end),0) as debit_expense,
       coalesce(sum(case when type = 'adjustment' then amount else 0 end),0) as adjustments,
       coalesce(sum(case
         when type = 'transfer' and goal_id is not null
@@ -113,10 +118,11 @@ router.get('/dashboard', async (req, res) => {
 
   const income = toNumber(monthAgg?.income)
   const expense = toNumber(monthAgg?.expense)
+  const debitExpense = toNumber(monthAgg?.debit_expense)
   const adjustments = toNumber(monthAgg?.adjustments)
   const goalTransfers = toNumber(monthAgg?.goal_transfers)
-  // Aporte (to_goal) reduz o resultado; resgate aumenta — sem misturar com Despesas
-  const result = income - expense + goalTransfers
+  // Saldo/resultado de caixa: só conta corrente (débito + aportes). Crédito fica em Despesas, não no saldo.
+  const result = income - debitExpense + goalTransfers
   if (balancesFromAccounts || bounds.period === 'all') {
     closingBalance = openingBalance + result + adjustments
   }
@@ -153,7 +159,8 @@ router.get('/dashboard', async (req, res) => {
        select (${EFF})::date as d,
          coalesce(sum(case
            when type = 'income' then amount
-           when type = 'expense' and paid = true then -amount
+           when type = 'expense' and paid = true
+             and coalesce(payment_method, 'debit') <> 'credit' then -amount
            when type = 'adjustment' then amount
            when type = 'transfer' and goal_id is not null
              and coalesce(goal_direction, 'to_goal') = 'from_goal' then amount
@@ -251,6 +258,7 @@ router.get('/dashboard', async (req, res) => {
     balancesAnchored: balancesFromAccounts || bounds.period === 'all',
     income,
     expense,
+    debitExpense,
     adjustments,
     goalTransfers,
     result,

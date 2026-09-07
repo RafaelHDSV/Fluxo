@@ -14,7 +14,7 @@
 | Conta corrente | Move saldo (± amount conforme direção) |
 | Caixinha | `current_amount` ± amount conforme direção |
 | Despesas / receitas | Sem `goal_id` (API rejeita) |
-| Relatórios | Transferência com caixinha **não** entra em income/expense; entra no **Saldo do mês** (aporte negativo) e no cashflow |
+| Relatórios | Transferência com caixinha **não** entra em Despesas; entra no **Saldo do mês** (aporte negativo). Cartão **não** entra no Saldo do mês (só caixa da corrente) |
 | CRUD caixinha | Investimentos: criar, editar e excluir direto |
 | OFX | Linha do extrato pode ser convertida para transferência + caixinha |
 

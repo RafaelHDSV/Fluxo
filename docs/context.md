@@ -56,7 +56,7 @@ Envs: `frontend/.env` e `backend/.env` a partir dos `.env.example`. Migrations e
 11. Importação: preview aplica regras de rename → categoria; **stepper** revisa descrição/categoria das linhas novas antes do commit
 12. **Crédito:** `date` = data da compra; `due_date` = vencimento da fatura (ciclo `closing_day` + `due_day` do cartão). Resultado, orçamentos e filtros de período usam a data efetiva (`coalesce` do vencimento no crédito). Histórico antigo sem `due_date` continua em `date`
 13. **Shell:** sidebar em `lg+`; mobile com nav inferior + sheet “Mais”; `viewport-fit=cover` e safe-area
-14. **Saldo do mês (dashboard)** = receitas (+ mês anterior) − despesas pagas + transferências de caixinha (`to_goal` negativo, `from_goal` positivo)
+14. **Saldo do mês (dashboard)** = receitas (+ mês anterior) − despesas no **débito** pagas + transferências de caixinha (`to_goal` negativo). **Cartão não entra** no saldo (só no card Despesas / categorias)
 
 ---
 
