@@ -215,7 +215,7 @@ export function DashboardPage() {
               tone={saldoMes >= 0 ? 'positive' : 'negative'}
               hint={
                 data.balancesAnchored
-                  ? 'Saldo atual da conta (Santander)'
+                  ? 'Saldo atual da conta'
                   : goalTransfers !== 0
                     ? `Estimativa do período − aportes · sem cartão`
                     : 'Estimativa: receitas − débitos (sem cartão)'

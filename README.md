@@ -6,6 +6,27 @@ Controle financeiro pessoal para entender o mês sem virar planilha: contas, lan
 
 Uso individual em **BRL**, com autenticação Supabase e dados isolados por usuário (RLS).
 
+App: [fluxo-vieira.vercel.app](https://fluxo-vieira.vercel.app/)
+
+### Preview (dados fictícios)
+
+Valores inventados e bem acima do uso pessoal — só para ilustrar a UI.
+
+![Dashboard do Fluxo](demo-screenshots/01-dashboard.png)
+
+<details>
+<summary>Mais telas</summary>
+
+![Login](demo-screenshots/00-login.png)
+
+![Transações](demo-screenshots/02-transacoes.png)
+
+![Contas](demo-screenshots/03-contas.png)
+
+![Investimentos / caixinhas](demo-screenshots/04-investimentos.png)
+
+</details>
+
 ---
 
 ## Por que existe
