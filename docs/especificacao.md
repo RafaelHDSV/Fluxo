@@ -27,8 +27,8 @@ Controle financeiro pessoal com o **Dashboard** como tela principal: registrar e
 | Área | Entrega |
 |------|---------|
 | Auth | Cadastro/login Supabase (e-mail/senha); dados sob RLS |
-| Contas | Débito e cartão; saldo editável; ciclo de fechamento/vencimento no crédito |
-| Transações | CRUD; filtros de período; crédito com data da compra + `due_date` |
+| Contas | Débito e cartão; saldo âncora (editável / OFX `LEDGERBAL`); marcar pago **não** altera saldo |
+| Transações | CRUD; filtros de período; crédito com data da compra + `due_date`; `paid` = status A pagar |
 | Importações | OFX Santander (Money 2000+) e CSV/OFX genérico; regras; preview + stepper |
 | Orçamentos | Limite por categoria; progresso e alerta |
 | Investimentos | Caixinhas com progresso (ex-Metas) |

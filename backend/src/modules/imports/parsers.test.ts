@@ -45,4 +45,22 @@ const h2 = buildDedupeHash({
 })
 assert.equal(h1, h2)
 
+const fitJul = buildDedupeHash({
+  userId: 'u1',
+  date: '2026-07-08',
+  amount: 19.89,
+  description: 'Seguro',
+  accountId: 'a1',
+  fitid: '046243',
+})
+const fitAgo = buildDedupeHash({
+  userId: 'u1',
+  date: '2026-08-10',
+  amount: 19.89,
+  description: 'Seguro',
+  accountId: 'a1',
+  fitid: '046243',
+})
+assert.notEqual(fitJul, fitAgo)
+
 console.log('parsers.test.ts ok')

@@ -295,6 +295,8 @@ router.put('/:id', async (req, res) => {
     payment_method = parsed
   }
 
+  // Toggle de `paid` é só status (A pagar) — não move saldo.
+  // Efeito de caixa usa o `paid` já persistido; criar já pago / valor / meio / conta sim.
   const oldCash = checkingCashDelta({
     type: existing.type,
     amount: toNumber(existing.amount),
@@ -304,7 +306,7 @@ router.put('/:id', async (req, res) => {
   const newCash = checkingCashDelta({
     type,
     amount,
-    paid,
+    paid: existing.paid,
     paymentMethod: payment_method,
   })
 
@@ -503,18 +505,7 @@ router.post('/bulk-paid', async (req, res) => {
     return res.status(400).json({ error: 'ids inválidos' })
   }
 
-  const before = await query<{
-    id: string
-    amount: string
-    paid: boolean
-    payment_method: string | null
-    account_id: string
-  }>(
-    `select id, amount, paid, payment_method, account_id from ${T.transactions}
-     where user_id = $1 and id = any($2::uuid[]) and type = 'expense'`,
-    [req.userId, cleaned],
-  )
-
+  // Só status — não aplica delta de saldo (OFX/LEDGERBAL ou criar já pago cuidam do caixa).
   const updated = await query<{ id: string }>(
     `update ${T.transactions}
      set paid = $3, updated_at = now()
@@ -522,23 +513,6 @@ router.post('/bulk-paid', async (req, res) => {
      returning id`,
     [req.userId, cleaned, paid],
   )
-
-  for (const row of before) {
-    if (row.paid === paid) continue
-    const oldCash = checkingCashDelta({
-      type: 'expense',
-      amount: toNumber(row.amount),
-      paid: row.paid,
-      paymentMethod: row.payment_method,
-    })
-    const newCash = checkingCashDelta({
-      type: 'expense',
-      amount: toNumber(row.amount),
-      paid,
-      paymentMethod: row.payment_method,
-    })
-    await applyAccountBalanceDelta(req.userId!, row.account_id, newCash - oldCash)
-  }
 
   res.json({ updated: updated.length })
 })

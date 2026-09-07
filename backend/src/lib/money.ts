@@ -18,8 +18,9 @@ export function buildDedupeHash(input: {
   fitid?: string | null
 }) {
   const fitid = input.fitid && input.fitid !== '000000' ? input.fitid : null
+  // Santander reutiliza FITID em parcelas recorrentes (ex.: seguro) — incluir a data.
   const base = fitid
-    ? `${input.userId}|fitid|${fitid}|${input.accountId}`
+    ? `${input.userId}|fitid|${fitid}|${input.accountId}|${input.date}`
     : [
         input.userId,
         input.date,

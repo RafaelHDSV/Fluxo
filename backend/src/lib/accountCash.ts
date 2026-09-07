@@ -1,8 +1,23 @@
 import { query } from './db.js'
 import { T } from './tables.js'
 
-/** Despesa no crédito não altera saldo da conta corrente. */
-export function isCheckingCashExpense(type: string, paymentMethod: string | null | undefined, paid: boolean) {
+/**
+ * Caixa na conta corrente.
+ *
+ * - Receita / ajuste: sempre move saldo.
+ * - Despesa no crédito: nunca move conta corrente.
+ * - Despesa no débito: move saldo só quando `paid` é true **no momento em que o
+ *   efeito de caixa é calculado** (criar já pago, apagar, mudar valor/meio/conta).
+ *
+ * `paid` como *status* (A pagar): alternar pago/não pago **não** deve chamar
+ * `applyAccountBalanceDelta` — a existência/âncora (OFX LEDGERBAL) é a cobrança;
+ * confirmar pagamento não é uma segunda baixa.
+ */
+export function isCheckingCashExpense(
+  type: string,
+  paymentMethod: string | null | undefined,
+  paid: boolean,
+) {
   return type === 'expense' && paid && paymentMethod !== 'credit'
 }
 
@@ -21,7 +36,7 @@ export async function applyAccountBalanceDelta(userId: string, accountId: string
   )
 }
 
-/** Delta de caixa na conta corrente causado por um lançamento. */
+/** Delta de caixa na conta corrente causado por um lançamento (estrutura + paid “de caixa”). */
 export function checkingCashDelta(input: {
   type: string
   amount: number
