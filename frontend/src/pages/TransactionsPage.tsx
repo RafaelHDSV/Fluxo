@@ -44,6 +44,7 @@ import { api } from '@/services/api'
   closing_day?: number | null
 }
 type Category = { id: string; name: string; icon?: string | null; color?: string | null }
+type Goal = { id: string; name: string }
 type Tx = {
   id: string
   date: string
@@ -59,6 +60,8 @@ type Tx = {
   notes?: string | null
   paid: boolean
   payment_method: 'debit' | 'credit' | null
+  goal_id?: string | null
+  goal_name?: string | null
 }
 
 type TxResponse = { items: Tx[]; total: number; limit: number; offset: number }
@@ -78,6 +81,7 @@ const emptyForm = {
   notes: '',
   paid: false,
   payment_method: 'debit' as '' | 'debit' | 'credit',
+  goal_id: '',
 }
 
 function monthKey(date: string) {
@@ -118,6 +122,7 @@ export function TransactionsPage() {
   })
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [goals, setGoals] = useState<Goal[]>([])
   const [q, setQ] = useState(() => searchParams.get('q') || '')
   const [debouncedQ, setDebouncedQ] = useState(() => searchParams.get('q') || '')
   const [type, setType] = useState(() => searchParams.get('type') || '')
@@ -158,6 +163,8 @@ export function TransactionsPage() {
   const isIncomeOnly = type === 'income'
   const isExpenseForm = form.type === 'expense'
   const isCreditForm = isExpenseForm && form.payment_method === 'credit'
+  const showGoalSelect =
+    (form.type === 'expense' || form.type === 'income') && form.payment_method !== 'credit'
   const showMeioColumn = !isIncomeOnly
   const tableColSpan = colSpanFor(showMeioColumn, isIncomeOnly)
 
@@ -259,15 +266,17 @@ export function TransactionsPage() {
         }
       }
       const qs = params.toString()
-      const [txRes, accs, cats] = await Promise.all([
+      const [txRes, accs, cats, goalsRes] = await Promise.all([
         api.get<TxResponse>(`/api/transactions?${qs}`),
         api.get<Account[]>('/api/accounts'),
         api.get<Category[]>('/api/categories'),
+        api.get<Goal[]>('/api/goals'),
       ])
       setItems(txRes.items)
       setTotal(txRes.total)
       setAccounts(accs)
       setCategories(cats)
+      setGoals(goalsRes)
       setForm((f) => ({
         ...f,
         account_id: f.account_id || accs[0]?.id || '',
@@ -293,6 +302,8 @@ export function TransactionsPage() {
       type: urlType,
       paid: urlType === 'income' ? true : f.type === urlType ? f.paid : false,
       payment_method: urlType === 'expense' ? f.payment_method || 'debit' : '',
+      goal_id:
+        urlType === 'transfer' || urlType === 'adjustment' ? '' : f.goal_id,
     }))
   }, [searchParams, editingId])
 
@@ -331,6 +342,8 @@ export function TransactionsPage() {
     e.preventDefault()
     setError('')
     try {
+      const canLinkGoal =
+        (form.type === 'expense' || form.type === 'income') && form.payment_method !== 'credit'
       const payload = {
         date: form.date,
         description: form.description,
@@ -345,6 +358,7 @@ export function TransactionsPage() {
         transfer_account_id:
           form.type === 'transfer' && form.transfer_account_id ? form.transfer_account_id : null,
         notes: form.type === 'adjustment' && form.notes ? form.notes : null,
+        goal_id: canLinkGoal ? form.goal_id || null : null,
       }
       if (editingId) await api.put(`/api/transactions/${editingId}`, payload)
       else await api.post('/api/transactions', payload)
@@ -468,6 +482,7 @@ export function TransactionsPage() {
       notes: tx.notes || '',
       paid: Boolean(tx.paid),
       payment_method: tx.payment_method || 'debit',
+      goal_id: tx.goal_id || '',
     })
     requestAnimationFrame(() => {
       formCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -563,6 +578,8 @@ export function TransactionsPage() {
                       type: v,
                       paid: v === 'income' ? true : false,
                       payment_method: v === 'expense' ? form.payment_method || 'debit' : '',
+                      goal_id:
+                        v === 'transfer' || v === 'adjustment' ? '' : form.goal_id,
                     })
                   }
                 >
@@ -595,6 +612,7 @@ export function TransactionsPage() {
                           method === 'credit'
                             ? previewDueDate(form.date, cardId) || form.due_date
                             : '',
+                        goal_id: method === 'credit' ? '' : form.goal_id,
                       })
                     }}
                   >
@@ -721,6 +739,27 @@ export function TransactionsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {showGoalSelect && (
+                <div className="space-y-2">
+                  <Label>Caixinha</Label>
+                  <Select
+                    value={form.goal_id || '__none__'}
+                    onValueChange={(v) => setForm({ ...form, goal_id: v === '__none__' ? '' : v })}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Nenhuma" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Nenhuma</SelectItem>
+                      {goals.map((g) => (
+                        <SelectItem key={g.id} value={g.id}>
+                          {g.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {isExpenseForm && (
                 <div className="flex items-end gap-2 pb-2">
                   <Checkbox
@@ -971,7 +1010,14 @@ export function TransactionsPage() {
                               )}
                             </TableCell>
                             <TableCell className="max-w-[220px]">
-                              <TruncatedText text={tx.description} />
+                              <div className="flex min-w-0 flex-col gap-1">
+                                <TruncatedText text={tx.description} />
+                                {tx.goal_name ? (
+                                  <Badge variant="outline" className="w-fit max-w-full truncate">
+                                    {tx.goal_name}
+                                  </Badge>
+                                ) : null}
+                              </div>
                             </TableCell>
                             <TableCell className="max-w-[160px]">
                               {categoryMap[tx.category_id] ? (

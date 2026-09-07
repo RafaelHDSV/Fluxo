@@ -50,7 +50,7 @@ Envs: `frontend/.env` e `backend/.env` a partir dos `.env.example`. Migrations e
 5. Tailwind + shadcn com tema dark/light
 6. **Entrada de dados mensal:** OFX da conta Santander (Money 2000+); CSV/OFX genérico também
 7. Orçamentos = categorias + metas de gasto; **regras de rename/categoria ficam em Importações**
-8. Investimentos = ex-Metas (`fluxo_goals`) — caixinhas com progresso
+8. Investimentos = ex-Metas (`fluxo_goals`) — caixinhas com progresso; aporte/resgate via transação com `goal_id` (despesa/receita)
 9. Notion foi carga inicial histórica; **não é fonte operacional**
 10. **Saldo das contas** é a âncora (editável; OFX via `LEDGERBAL`). Criar receita/ajuste ou despesa **já paga** no débito ajusta o saldo; **marcar/desmarcar pago é só status** (A pagar) e **não** baixa de novo — evita duplicar após importar o extrato. Saldo inicial do mês = saldo atual − movimento de caixa do mês (`date`, despesa débito paga; sem crédito) — **não** a soma histórica do Notion
 11. Importação: preview aplica regras de rename → categoria; **stepper** revisa descrição/categoria das linhas novas antes do commit
@@ -92,6 +92,7 @@ Dashboard · Transações · A pagar · Importações · Contas · Orçamentos �
 | `006_due_date.sql` | Vencimento no crédito |
 | `007_goals_optional_target.sql` | Meta opcional em investimentos |
 | `008_import_ledger_balance.sql` | LEDGERBAL do OFX persistido no preview → commit |
+| `009_transaction_goal_id.sql` | `goal_id` em transações → caixinha |
 
 ---
 

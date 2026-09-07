@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { applyAccountBalanceDelta, checkingCashDelta } from '../../lib/accountCash.js'
 import { computeCreditDueDate, effectiveDateSql } from '../../lib/creditCycle.js'
 import { query, queryOne } from '../../lib/db.js'
+import { applyGoalAmountDelta, goalAmountDelta } from '../../lib/goalCash.js'
 import { buildDedupeHash, toNumber } from '../../lib/money.js'
 import { T } from '../../lib/tables.js'
 import { requireAuth } from '../../middleware/auth.js'
@@ -23,6 +24,29 @@ function parsePaymentMethod(value: unknown): 'debit' | 'credit' | null | undefin
   if (value === null || value === '') return null
   if (value === 'debit' || value === 'credit') return value
   return undefined
+}
+
+async function resolveGoalId(input: {
+  userId: string
+  goalId: unknown
+  type: string
+  paymentMethod: string | null
+}): Promise<{ goal_id: string | null; error?: string }> {
+  if (input.goalId === undefined) return { goal_id: null } // caller decide keep-existing no PUT
+  if (input.goalId === null || input.goalId === '') return { goal_id: null }
+  if (typeof input.goalId !== 'string') return { goal_id: null, error: 'goal_id inválido' }
+  if (input.type !== 'expense' && input.type !== 'income') {
+    return { goal_id: null, error: 'goal_id só permitido em despesa ou receita' }
+  }
+  if (input.type === 'expense' && input.paymentMethod === 'credit') {
+    return { goal_id: null, error: 'Despesa no crédito não pode vincular caixinha' }
+  }
+  const goal = await queryOne(`select id from ${T.goals} where id = $1 and user_id = $2`, [
+    input.goalId,
+    input.userId,
+  ])
+  if (!goal) return { goal_id: null, error: 'Caixinha não encontrada' }
+  return { goal_id: input.goalId }
 }
 
 async function resolveDueDate(input: {
@@ -71,50 +95,51 @@ async function resolveDueDate(input: {
 router.get('/', async (req, res) => {
   const { q, type, account_id, category_id, from, to, paid, payment_method } = req.query
   const params: unknown[] = [req.userId]
-  const where = ['user_id = $1']
+  const EFF_T = effectiveDateSql('t')
+  const where = ['t.user_id = $1']
 
   if (typeof q === 'string' && q.trim()) {
     params.push(`%${q.trim()}%`)
-    where.push(`description ilike $${params.length}`)
+    where.push(`t.description ilike $${params.length}`)
   }
   if (typeof type === 'string' && type) {
     params.push(type)
-    where.push(`type = $${params.length}`)
+    where.push(`t.type = $${params.length}`)
   }
   if (typeof account_id === 'string' && account_id) {
     params.push(account_id)
-    where.push(`account_id = $${params.length}`)
+    where.push(`t.account_id = $${params.length}`)
   }
   if (typeof category_id === 'string' && category_id) {
     params.push(category_id)
-    where.push(`category_id = $${params.length}`)
+    where.push(`t.category_id = $${params.length}`)
   }
   if (typeof from === 'string' && from) {
     params.push(from)
-    where.push(`${EFF} >= $${params.length}`)
+    where.push(`${EFF_T} >= $${params.length}`)
   }
   if (typeof to === 'string' && to) {
     params.push(to)
-    where.push(`${EFF} <= $${params.length}`)
+    where.push(`${EFF_T} <= $${params.length}`)
   }
   const paidFilter = parsePaid(paid)
   if (paidFilter !== null) {
     params.push(paidFilter)
-    where.push(`paid = $${params.length}`)
+    where.push(`t.paid = $${params.length}`)
   }
   if (typeof payment_method === 'string' && (payment_method === 'debit' || payment_method === 'credit')) {
     params.push(payment_method)
-    where.push(`payment_method = $${params.length}`)
+    where.push(`t.payment_method = $${params.length}`)
   }
 
   const limitRaw = typeof req.query.limit === 'string' ? Number(req.query.limit) : 50
   const offsetRaw = typeof req.query.offset === 'string' ? Number(req.query.offset) : 0
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(Math.trunc(limitRaw), 1), 200) : 50
   const offset = Number.isFinite(offsetRaw) ? Math.max(Math.trunc(offsetRaw), 0) : 0
-  const sortBy = req.query.sort === 'effective' ? EFF : 'date'
+  const sortBy = req.query.sort === 'effective' ? EFF_T : 't.date'
 
   const countRow = await queryOne<{ count: string }>(
-    `select count(*)::text as count from ${T.transactions} where ${where.join(' and ')}`,
+    `select count(*)::text as count from ${T.transactions} t where ${where.join(' and ')}`,
     params,
   )
   const total = Number(countRow?.count ?? 0)
@@ -122,10 +147,11 @@ router.get('/', async (req, res) => {
   const limitIdx = params.length + 1
   const offsetIdx = params.length + 2
   const rows = await query(
-    `select *, (${EFF})::text as effective_date
-     from ${T.transactions}
+    `select t.*, (${EFF_T})::text as effective_date, g.name as goal_name
+     from ${T.transactions} t
+     left join ${T.goals} g on g.id = t.goal_id
      where ${where.join(' and ')}
-     order by ${sortBy} desc, date desc, created_at desc
+     order by ${sortBy} desc, t.date desc, t.created_at desc
      limit $${limitIdx} offset $${offsetIdx}`,
     [...params, limit, offset],
   )
@@ -207,6 +233,17 @@ router.post('/', async (req, res) => {
 
   const paid = parsePaid(body.paid) ?? true
 
+  const goalResolved = await resolveGoalId({
+    userId: req.userId!,
+    goalId: body.goal_id !== undefined ? body.goal_id : null,
+    type: String(type),
+    paymentMethod: resolvedMethod,
+  })
+  if (goalResolved.error) {
+    return res.status(400).json({ error: goalResolved.error })
+  }
+  const resolvedGoalId = goalResolved.goal_id
+
   const dedupe_hash = buildDedupeHash({
     userId: req.userId!,
     date,
@@ -217,12 +254,28 @@ router.post('/', async (req, res) => {
   })
 
   const amountNum = toNumber(amount)
+  const gDelta = goalAmountDelta({ type: String(type), amount: amountNum, goalId: resolvedGoalId })
+
+  // Prefer: checar saldo da caixinha antes do insert no resgate (income + goal)
+  if (gDelta < 0 && resolvedGoalId) {
+    const goalRow = await queryOne<{ current_amount: string }>(
+      `select current_amount from ${T.goals} where id = $1 and user_id = $2`,
+      [resolvedGoalId, req.userId],
+    )
+    if (!goalRow) {
+      return res.status(400).json({ error: 'Caixinha não encontrada' })
+    }
+    if (toNumber(goalRow.current_amount) + gDelta < -0.001) {
+      return res.status(400).json({ error: 'Saldo da caixinha insuficiente' })
+    }
+  }
+
   try {
-    const row = await queryOne(
+    const row = await queryOne<{ id: string }>(
       `insert into ${T.transactions}
         (user_id, date, description, amount, type, category_id, account_id, transfer_account_id,
-         card_account_id, tags, notes, dedupe_hash, external_fitid, paid, payment_method, source_ref, due_date)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+         card_account_id, tags, notes, dedupe_hash, external_fitid, paid, payment_method, source_ref, due_date, goal_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
        returning *, (${EFF})::text as effective_date`,
       [
         req.userId,
@@ -242,6 +295,7 @@ router.post('/', async (req, res) => {
         resolvedMethod,
         source_ref ?? null,
         dueResolved.due_date,
+        resolvedGoalId,
       ],
     )
     await applyAccountBalanceDelta(
@@ -249,6 +303,18 @@ router.post('/', async (req, res) => {
       account_id,
       checkingCashDelta({ type, amount: amountNum, paid, paymentMethod: resolvedMethod }),
     )
+    if (gDelta !== 0 && resolvedGoalId && row) {
+      const r = await applyGoalAmountDelta(req.userId!, resolvedGoalId, gDelta)
+      if (!r.ok) {
+        await queryOne(`delete from ${T.transactions} where id = $1 and user_id = $2`, [row.id, req.userId])
+        await applyAccountBalanceDelta(
+          req.userId!,
+          account_id,
+          -checkingCashDelta({ type, amount: amountNum, paid, paymentMethod: resolvedMethod }),
+        )
+        return res.status(400).json({ error: r.error })
+      }
+    }
     res.status(201).json(row)
   } catch (error: unknown) {
     const pgError = error as { code?: string }
@@ -274,6 +340,7 @@ router.put('/:id', async (req, res) => {
     source_ref: string | null
     card_account_id: string | null
     due_date: string | null
+    goal_id: string | null
   }>(`select * from ${T.transactions} where id = $1 and user_id = $2`, [req.params.id, req.userId])
 
   if (!existing) return res.status(404).json({ error: 'Transação não encontrada' })
@@ -355,6 +422,65 @@ router.put('/:id', async (req, res) => {
 
   const source_ref = body.source_ref !== undefined ? body.source_ref : existing.source_ref
 
+  // goal_id: undefined → manter existing (revalidando tipo/meio); null/'' → limpar
+  const goalIdInput = body.goal_id !== undefined ? body.goal_id : existing.goal_id
+  let newGoalId: string | null = null
+  if (goalIdInput) {
+    const goalResolved = await resolveGoalId({
+      userId: req.userId!,
+      goalId: goalIdInput,
+      type,
+      paymentMethod: payment_method,
+    })
+    if (goalResolved.error) {
+      return res.status(400).json({ error: goalResolved.error })
+    }
+    newGoalId = goalResolved.goal_id
+  }
+
+  const oldGoalDelta = goalAmountDelta({
+    type: existing.type,
+    amount: toNumber(existing.amount),
+    goalId: existing.goal_id,
+  })
+  const newGoalDelta = goalAmountDelta({ type, amount, goalId: newGoalId })
+
+  // Pre-validate reverse of old goal effect (expense aporte → negative reverse) before UPDATE
+  // so we never commit the row then fail with 400 and leave caixinha drift.
+  if (existing.goal_id && oldGoalDelta > 0) {
+    const oldGoalRow = await queryOne<{ current_amount: string }>(
+      `select current_amount from ${T.goals} where id = $1 and user_id = $2`,
+      [existing.goal_id, req.userId],
+    )
+    if (!oldGoalRow) {
+      return res.status(400).json({ error: 'Caixinha não encontrada' })
+    }
+    if (toNumber(oldGoalRow.current_amount) + -oldGoalDelta < -0.001) {
+      return res.status(400).json({
+        error:
+          'Não é possível desvincular/alterar: saldo da caixinha insuficiente para reverter o aporte',
+      })
+    }
+  }
+
+  // Validate new-goal balance before any mutation (account for reverse of old on same goal)
+  if (newGoalId && newGoalDelta < 0) {
+    const goalRow = await queryOne<{ current_amount: string }>(
+      `select current_amount from ${T.goals} where id = $1 and user_id = $2`,
+      [newGoalId, req.userId],
+    )
+    if (!goalRow) {
+      return res.status(400).json({ error: 'Caixinha não encontrada' })
+    }
+    const afterRevert =
+      existing.goal_id === newGoalId
+        ? toNumber(goalRow.current_amount) - oldGoalDelta
+        : toNumber(goalRow.current_amount)
+    if (afterRevert + newGoalDelta < -0.001) {
+      return res.status(400).json({ error: 'Saldo da caixinha insuficiente' })
+    }
+  }
+
   const dedupe_hash = buildDedupeHash({
     userId: req.userId!,
     date,
@@ -364,48 +490,77 @@ router.put('/:id', async (req, res) => {
     fitid: external_fitid,
   })
 
-  const row = await queryOne(
-    `update ${T.transactions} set
-      date = $3,
-      description = $4,
-      amount = $5,
-      type = coalesce($6, type),
-      category_id = coalesce($7, category_id),
-      account_id = $8,
-      transfer_account_id = coalesce($9, transfer_account_id),
-      card_account_id = $10,
-      tags = coalesce($11, tags),
-      notes = coalesce($12, notes),
-      dedupe_hash = $13,
-      external_fitid = $14,
-      paid = $15,
-      payment_method = $16,
-      source_ref = $17,
-      due_date = $18,
-      updated_at = now()
-     where id = $1 and user_id = $2
-     returning *, (${EFF})::text as effective_date`,
-    [
-      req.params.id,
-      req.userId,
-      date,
-      description,
-      amount,
-      type,
-      body.category_id ?? null,
-      account_id,
-      body.transfer_account_id ?? null,
-      finalCard,
-      body.tags ?? null,
-      body.notes ?? null,
-      dedupe_hash,
-      external_fitid ?? null,
-      paid,
-      payment_method,
-      source_ref ?? null,
-      finalDue,
-    ],
-  )
+  let row
+  try {
+    row = await queryOne(
+      `update ${T.transactions} set
+        date = $3,
+        description = $4,
+        amount = $5,
+        type = coalesce($6, type),
+        category_id = coalesce($7, category_id),
+        account_id = $8,
+        transfer_account_id = coalesce($9, transfer_account_id),
+        card_account_id = $10,
+        tags = coalesce($11, tags),
+        notes = coalesce($12, notes),
+        dedupe_hash = $13,
+        external_fitid = $14,
+        paid = $15,
+        payment_method = $16,
+        source_ref = $17,
+        due_date = $18,
+        goal_id = $19,
+        updated_at = now()
+       where id = $1 and user_id = $2
+       returning *, (${EFF})::text as effective_date`,
+      [
+        req.params.id,
+        req.userId,
+        date,
+        description,
+        amount,
+        type,
+        body.category_id ?? null,
+        account_id,
+        body.transfer_account_id ?? null,
+        finalCard,
+        body.tags ?? null,
+        body.notes ?? null,
+        dedupe_hash,
+        external_fitid ?? null,
+        paid,
+        payment_method,
+        source_ref ?? null,
+        finalDue,
+        newGoalId,
+      ],
+    )
+  } catch (error: unknown) {
+    // UPDATE failed — caixinha must remain untouched
+    const pgError = error as { code?: string }
+    if (pgError.code === '23505') {
+      return res.status(409).json({ error: 'Transação duplicada' })
+    }
+    throw error
+  }
+
+  // Only after successful UPDATE: reverse old goal effect, then apply new
+  if (existing.goal_id && oldGoalDelta !== 0) {
+    const revert = await applyGoalAmountDelta(req.userId!, existing.goal_id, -oldGoalDelta)
+    if (!revert.ok) {
+      return res.status(400).json({ error: revert.error })
+    }
+  }
+  if (newGoalId && newGoalDelta !== 0) {
+    const apply = await applyGoalAmountDelta(req.userId!, newGoalId, newGoalDelta)
+    if (!apply.ok) {
+      if (existing.goal_id && oldGoalDelta !== 0) {
+        await applyGoalAmountDelta(req.userId!, existing.goal_id, oldGoalDelta)
+      }
+      return res.status(400).json({ error: apply.error })
+    }
+  }
 
   // Reverte efeito antigo e aplica o novo (conta pode ter mudado)
   if (existing.account_id === account_id) {
@@ -426,11 +581,40 @@ router.delete('/:id', async (req, res) => {
     paid: boolean
     payment_method: string | null
     account_id: string
-  }>(`select id, type, amount, paid, payment_method, account_id from ${T.transactions} where id = $1 and user_id = $2`, [
-    req.params.id,
-    req.userId,
-  ])
+    goal_id: string | null
+  }>(
+    `select id, type, amount, paid, payment_method, account_id, goal_id from ${T.transactions} where id = $1 and user_id = $2`,
+    [req.params.id, req.userId],
+  )
   if (!existing) return res.status(404).json({ error: 'Transação não encontrada' })
+
+  const gDelta = goalAmountDelta({
+    type: existing.type,
+    amount: toNumber(existing.amount),
+    goalId: existing.goal_id,
+  })
+
+  // Reverse caixinha BEFORE delete/account restore — avoids double money if reverse fails
+  if (gDelta !== 0 && existing.goal_id) {
+    if (gDelta > 0) {
+      const goalRow = await queryOne<{ current_amount: string }>(
+        `select current_amount from ${T.goals} where id = $1 and user_id = $2`,
+        [existing.goal_id, req.userId],
+      )
+      if (!goalRow) {
+        return res.status(400).json({ error: 'Caixinha não encontrada' })
+      }
+      if (toNumber(goalRow.current_amount) - gDelta < -0.001) {
+        return res.status(400).json({
+          error: 'Não é possível excluir: saldo da caixinha insuficiente para reverter o aporte',
+        })
+      }
+    }
+    const r = await applyGoalAmountDelta(req.userId!, existing.goal_id, -gDelta)
+    if (!r.ok) {
+      return res.status(500).json({ error: r.error })
+    }
+  }
 
   await queryOne(`delete from ${T.transactions} where id = $1 and user_id = $2 returning id`, [
     req.params.id,
@@ -465,11 +649,42 @@ router.post('/bulk-delete', async (req, res) => {
     paid: boolean
     payment_method: string | null
     account_id: string
+    goal_id: string | null
   }>(
-    `select id, type, amount, paid, payment_method, account_id from ${T.transactions}
+    `select id, type, amount, paid, payment_method, account_id, goal_id from ${T.transactions}
      where user_id = $1 and id = any($2::uuid[])`,
     [req.userId, cleaned],
   )
+
+  // Pre-check + reverse caixinhas BEFORE delete/account restore
+  for (const row of existing) {
+    const gDelta = goalAmountDelta({
+      type: row.type,
+      amount: toNumber(row.amount),
+      goalId: row.goal_id,
+    })
+    if (gDelta === 0 || !row.goal_id) continue
+
+    if (gDelta > 0) {
+      const goalRow = await queryOne<{ current_amount: string }>(
+        `select current_amount from ${T.goals} where id = $1 and user_id = $2`,
+        [row.goal_id, req.userId],
+      )
+      if (!goalRow) {
+        return res.status(400).json({ error: 'Caixinha não encontrada' })
+      }
+      if (toNumber(goalRow.current_amount) - gDelta < -0.001) {
+        return res.status(400).json({
+          error: 'Não é possível excluir: saldo da caixinha insuficiente para reverter o aporte',
+        })
+      }
+    }
+    const r = await applyGoalAmountDelta(req.userId!, row.goal_id, -gDelta)
+    if (!r.ok) {
+      return res.status(500).json({ error: r.error })
+    }
+  }
+
   const deleted = await query<{ id: string }>(
     `delete from ${T.transactions}
      where user_id = $1 and id = any($2::uuid[])
