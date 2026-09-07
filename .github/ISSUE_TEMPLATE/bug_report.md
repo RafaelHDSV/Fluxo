@@ -1,45 +1,40 @@
 ---
 name: Bug report
-about: Report a problem or unexpected behavior
+about: Reportar um problema ou comportamento inesperado
 title: "[BUG] "
 labels: bug
 assignees: ""
 ---
 
-## 🐛 Bug Description
+## Descrição
 
-Describe the bug clearly and concisely.
+Descreva o bug de forma clara e objetiva.
 
----
-
-## 🔁 Steps to Reproduce
+## Passos para reproduzir
 
 1.
 2.
 3.
 
----
+## Comportamento esperado
 
-## 🎯 Expected Behavior
+O que deveria acontecer.
 
-Describe what you expected to happen.
+## Comportamento atual
 
----
+O que acontece de fato.
 
-## 📷 Screenshots
+## Ambiente
 
-If applicable, add screenshots.
+- SO:
+- Navegador:
+- Ambiente: local / produção
+- Conta: autenticada? (sim/não)
 
----
+## Capturas / logs
 
-## 💻 Environment
+Se útil, anexe screenshot ou trecho de log **sem** secrets.
 
-- OS:
-- Browser:
-- Version:
+## Contexto adicional
 
----
-
-## 📝 Additional Context
-
-Add any other relevant information.
+Qualquer detalhe relevante (importação OFX, cartão, caixinha, etc.).

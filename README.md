@@ -2,19 +2,18 @@
 
 > Veja seu dinheiro com clareza.
 
-Controle financeiro pessoal para quem quer **entender o mês** sem virar planilha. O Fluxo concentra contas, lançamentos, importação de extrato, orçamentos, investimentos e o que ainda falta pagar — com dashboard e gráficos pensados para o dia a dia.
+Controle financeiro pessoal para entender o mês sem virar planilha: contas, lançamentos, importação de extrato, orçamentos, caixinhas de investimento, a pagar, dashboard e relatórios.
 
-Feito para uso individual em BRL, com autenticação e dados isolados por usuário.
+Uso individual em **BRL**, com autenticação Supabase e dados isolados por usuário (RLS).
 
 ---
 
 ## Por que existe
 
-A maior parte das ferramentas financeiras ou é genérica demais, ou esconde o que importa atrás de agregadores caros. O Fluxo parte de decisões simples:
-
-- o **saldo das contas** é a âncora (não um histórico opaco)
-- a entrada mensal principal é o **OFX do Santander** (com CSV/OFX genérico de apoio)
-- no cartão, **compra** e **vencimento da fatura** são datas diferentes — o período usa o vencimento
+- O **saldo das contas** é a âncora (editável; OFX pode atualizar via `LEDGERBAL`)
+- No dashboard (período atual), o **Saldo do mês** espelha esse saldo — não é “receitas − despesas”
+- Entrada mensal principal: **OFX do Santander** (CSV/OFX genérico de apoio)
+- No cartão, **compra** e **vencimento** são datas diferentes; períodos usam o vencimento
 - Open Finance fica de fora de propósito (custo de agregador)
 
 ---
@@ -23,36 +22,33 @@ A maior parte das ferramentas financeiras ou é genérica demais, ou esconde o q
 
 ### Contas e saldo
 - Contas de débito e cartão de crédito
-- Saldo editável; importação OFX pode atualizar via `LEDGERBAL`
-- No crédito: dia de fechamento e dia de vencimento para calcular a fatura
+- Saldo âncora; OFX pode gravar `LEDGERBAL` no commit da importação
+- Cartão: dia de fechamento e vencimento para calcular a fatura
 
 ### Transações
-- Lançamentos manuais (receita e despesa)
-- Filtros por período (mês, ano ou histórico)
-- Crédito com data da compra + vencimento da fatura
+- Receita, despesa, **transferência** e ajuste
+- Despesa: meio débito/crédito; **marcar pago é só status** (não move saldo de novo)
+- Crédito: data da compra + vencimento da fatura
+- Transferência ↔ **caixinha** (aporte/resgate): não entra em Despesas/Receitas; move saldo da conta e o valor da caixinha
 
 ### Importações
 - OFX Santander (Money 2000+) e CSV/OFX genérico
 - Regras de renomeação e categorização
-- Preview + stepper para revisar linhas novas antes de gravar
+- Preview + stepper antes de gravar
 
-### Orçamentos e categorias
-- Limite de gasto por categoria
-- Progresso e alerta quando o uso se aproxima do limite
-
-### Investimentos e wishlist
-- Caixinhas de investimento com progresso
-- Lista de desejos com imagem opcional
+### Orçamentos, investimentos e wishlist
+- Limite por categoria com alerta perto do teto
+- Caixinhas (criar/editar/excluir) com progresso
+- Wishlist com imagem opcional
 
 ### A pagar, dashboard e relatórios
-- Visão do que está em aberto
-- KPIs do período, receita × despesa, gastos por categoria e resultado acumulado
-- Relatórios agregados no mesmo critério de período
+- Pendências do período
+- KPIs, gráficos (ECharts) e relatórios no mesmo critério de período
+- Despesas do dashboard incluem cartão; o **Saldo do mês** (período atual) segue a conta corrente
 
 ### Experiência
-- Tema claro e escuro
-- Sidebar no desktop; navegação inferior + menu “Mais” no celular
-- Layout pensado para telas pequenas (safe-area, filtros e calendário fluídos)
+- Tema claro/escuro
+- Sidebar no desktop; nav inferior + “Mais” no mobile (safe-area)
 
 ---
 
@@ -61,17 +57,17 @@ A maior parte das ferramentas financeiras ou é genérica demais, ou esconde o q
 | Camada | Tecnologia |
 |--------|------------|
 | Frontend | React 18, Vite, TypeScript, Tailwind, shadcn/ui, React Router, Apache ECharts, Lucide |
-| Backend | Node.js, Express 5 (BFF) |
-| Auth e banco | Supabase — PostgreSQL, Auth (e-mail/senha) e RLS |
-| Tooling | Yarn, Node 22+ |
+| Backend | Node.js, Express 5 (BFF; na Vercel vira Serverless Function em `/api`) |
+| Auth / DB | Supabase — PostgreSQL, Auth (e-mail/senha), RLS |
+| Tooling | Yarn workspaces-style na raiz, Node **22+** |
 
-O front fala com o BFF; o BFF valida o JWT do Supabase e acessa o Postgres. As tabelas usam o prefixo `fluxo_*`.
+Tabelas com prefixo `fluxo_*`. O front fala com o BFF; o BFF valida o JWT e acessa o Postgres.
 
 ---
 
 ## Pré-requisitos
 
-- Node.js 22 ou superior
+- Node.js 22+
 - Yarn
 - Projeto no [Supabase](https://supabase.com)
 
@@ -81,7 +77,7 @@ O front fala com o BFF; o BFF valida o JWT do Supabase e acessa o Postgres. As t
 
 ### 1. Banco
 
-No SQL Editor do Supabase, aplique as migrations em `backend/migrations/` **na ordem** (001 → 007).
+No SQL Editor do Supabase, aplique as migrations em `backend/migrations/` **na ordem** (`001` → `010`).
 
 ### 2. Variáveis de ambiente
 
@@ -90,16 +86,19 @@ cp frontend/.env.example frontend/.env
 cp backend/.env.example backend/.env
 ```
 
-Preencha com os dados do seu projeto Supabase:
-
 | Variável | Onde | Uso |
 |----------|------|-----|
 | `VITE_SUPABASE_URL` | frontend | URL do projeto |
 | `VITE_SUPABASE_ANON_KEY` | frontend | Chave anônima (cliente) |
 | `VITE_BACKEND_URL` | frontend | Local: `http://localhost:3693`. Produção (Vercel): **vazio** (same-origin) |
-| `SUPABASE_URL` / JWT / `DATABASE_URL` | backend | Conforme o `.env.example` do back |
+| `DATABASE_URL` | backend | Connection string Postgres |
+| `SUPABASE_URL` | backend | Auth / JWKS |
+| `SUPABASE_ANON_KEY` | backend | Runtime |
+| `SUPABASE_JWT_SECRET` | backend | Recomendado (Dashboard → Settings → API → JWT Secret) |
+| `CORS_ORIGIN` | backend | Local: `http://localhost:3333` |
+| `PORT` | backend | Local: `3693` (padrão no example) |
 
-Nunca commite arquivos `.env` com valores reais.
+Nunca commite `.env` com valores reais — só `.env.example` com placeholders.
 
 ### 3. Subir localmente
 
@@ -113,14 +112,14 @@ yarn dev
 | Frontend | http://localhost:3333 |
 | API (BFF) | http://localhost:3693 |
 
-Crie uma conta pela tela de registro e comece pelas contas (saldo) e, se quiser, pela importação OFX.
+Crie a conta na tela de registro, cadastre as contas (saldo) e, se quiser, importe o OFX.
 
 ---
 
 ## Scripts úteis
 
 ```bash
-cd backend && yarn test      # parsers OFX/CSV e ciclo de crédito
+cd backend && yarn test    # parsers OFX/CSV e ciclo de crédito
 cd frontend && yarn lint
 cd frontend && yarn build
 cd backend && yarn build
@@ -128,40 +127,65 @@ cd backend && yarn build
 
 ---
 
+## Estrutura (resumo)
+
+```
+frontend/          # Vite + React
+backend/           # Express BFF + migrations
+  migrations/      # SQL na ordem numérica
+  src/modules/     # rotas por domínio
+.github/           # templates de issue/PR
+```
+
+Pastas locais como `docs/` (notas de produto) e `backend/scripts/` (one-shots) **não** fazem parte do repositório público.
+
+---
+
 ## Deploy (Vercel — app único)
 
-Um único projeto na Vercel serve o **frontend (SPA)** e o **BFF Express** como Serverless Function (`/api/*`).
+Um projeto na Vercel serve o **SPA** e o **BFF** como Serverless Function (`/api/*`).
 
-1. Importe o repositório (Root Directory = raiz).
-2. Configure as variáveis de ambiente:
+1. Importe o repositório (Root Directory = raiz do monorepo).
+2. Configure:
 
 | Variável | Obrigatória | Notas |
 |----------|-------------|--------|
 | `VITE_SUPABASE_URL` | sim | Build do front |
 | `VITE_SUPABASE_ANON_KEY` | sim | Build do front |
-| `VITE_BACKEND_URL` | não | **Deixe vazio** em produção (same-origin) |
-| `DATABASE_URL` | sim | Runtime da function |
-| `SUPABASE_URL` | sim | Runtime (Auth/JWKS) |
+| `VITE_BACKEND_URL` | não | **Vazio** em produção |
+| `DATABASE_URL` | sim | Runtime |
+| `SUPABASE_URL` | sim | Runtime |
 | `SUPABASE_ANON_KEY` | sim | Runtime |
 | `SUPABASE_JWT_SECRET` | recomendado | Validação JWT |
-| `CORS_ORIGIN` | opcional | Em prod same-origin quase não importa; local usa `http://localhost:3333` |
+| `CORS_ORIGIN` | opcional | Local usa `http://localhost:3333` |
 
-3. Publique.
+3. Publique. Em produção o front chama `/api/...` no mesmo domínio.
 
-Local continua com `yarn dev` (front :3333 + API :3693). Em produção o front chama `/api/...` no mesmo domínio.
+---
+
+## Decisões de produto (para contribuidores)
+
+| Tema | Decisão |
+|------|--------|
+| Moeda | BRL apenas |
+| Open Finance | Fora de escopo |
+| Saldo | Âncora = `fluxo_accounts.balance`; período atual no dashboard usa essa âncora |
+| Pago | Toggle de despesa = status; não reaplica delta de caixa |
+| Crédito | Entra em despesas/orçamentos pela data efetiva; não move conta corrente até o pagamento da fatura |
+| Caixinhas | Aporte/resgate via transferência + `goal_id` / `goal_direction` |
+
+Mudanças que alterem essas decisões: discuta na issue antes de implementar.
 
 ---
 
 ## Contribuindo
 
-Pull requests são bem-vindos. Antes de abrir um PR:
-
-1. Descreva o problema e a solução no corpo do PR
+1. Descreva o problema e a solução no PR
 2. Rode lint, testes e build
-3. Evite secrets no diff
+3. Sem secrets no diff
 
-Veja [CONTRIBUTING.md](./CONTRIBUTING.md) e o [Código de Conduta](./CODE_OF_CONDUCT.md).  
-Vulnerabilidades: reporte em privado — [SECURITY.md](./SECURITY.md).
+Detalhes: [CONTRIBUTING.md](./CONTRIBUTING.md) · [Código de Conduta](./CODE_OF_CONDUCT.md)  
+Vulnerabilidades: [SECURITY.md](./SECURITY.md) (reporte em privado)
 
 ---
 

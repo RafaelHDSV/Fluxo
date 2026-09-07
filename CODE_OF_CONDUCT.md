@@ -29,7 +29,7 @@ Os mantenedores do projeto são responsáveis por esclarecer e aplicar estes pad
 
 ## Denúncia
 
-Se você vivenciar ou presenciar um comportamento inaceitável, denuncie em privado ao mantenedor (veja [SECURITY.md](./SECURITY.md) para o canal preferencial de contato sensível, ou use DM/e-mail privado).
+Se você vivenciar ou presenciar um comportamento inaceitável, denuncie em privado ao mantenedor ([perfil no GitHub](https://github.com/RafaelHDSV) ou canal descrito em [SECURITY.md](./SECURITY.md)).
 
 Todas as denúncias serão analisadas e respondidas de forma justa e, na medida do possível, confidencial.
 

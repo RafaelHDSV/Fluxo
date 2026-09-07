@@ -1,14 +1,25 @@
-## 📋 Descrição
-Descreva as alterações introduzidas nesta solicitação de pull request.
+## Descrição
+
 - Qual problema isso resolve?
 - O que foi alterado ou adicionado?
 
----
+## Como testar
 
-## 📸 Capturas de tela (se aplicável)
-Adicione capturas de tela para ajudar os revisores a entender a alteração.
+- [ ] `cd frontend && yarn lint && yarn build`
+- [ ] `cd backend && yarn test && yarn build`
+- [ ] Verificação manual (descreva o caminho feliz)
+- [ ] Se UI: chequei em viewport estreita (~320px)
 
----
+## Migrations
 
-## 📝 Observações adicionais
-Adicione qualquer contexto extra que possa ajudar os revisores.
+- [ ] Nenhuma
+- [ ] Incluí SQL em `backend/migrations/` (número e efeito no PR)
+
+## Segurança / dados
+
+- [ ] Sem `.env`, tokens ou IDs pessoais no diff
+- [ ] Sem forçar `docs/` ou `backend/scripts/` no Git
+
+## Observações
+
+Contexto extra para revisores (opcional).

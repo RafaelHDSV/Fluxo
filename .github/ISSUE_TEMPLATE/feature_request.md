@@ -1,35 +1,31 @@
 ---
 name: Feature request
-about: Suggest an improvement or new feature
+about: Sugerir uma melhoria ou nova funcionalidade
 title: "[FEATURE] "
 labels: enhancement
 assignees: ""
 ---
 
-## 🚀 Feature Description
+## Descrição
 
-Describe the feature you would like to see implemented.
+O que você gostaria de ver no Fluxo.
 
----
+## Problema que resolve
 
-## 🎯 Problem it Solves
+Por que isso importa no dia a dia financeiro.
 
-Explain what problem this feature solves.
+## Solução proposta
 
----
+Como você imagina o comportamento (telas, regras, edge cases).
 
-## 💡 Proposed Solution
+## Alternativas consideradas
 
-Describe how you imagine the solution working.
+Outras abordagens que você pensou (opcional).
 
----
+## Alinha com as decisões do produto?
 
-## 🔄 Alternatives Considered
+Consulte o [README](../../README.md) (seção de decisões). Se a ideia mudar âncora de saldo, Open Finance, multi-moeda etc., diga explicitamente.
 
-List any alternative solutions or features you've considered.
+## Contexto adicional
 
----
-
-## 📎 Additional Context
-
-Add any other relevant context or references.
+Referências, mocks ou exemplos (sem dados pessoais reais).

@@ -2,13 +2,13 @@
 
 ## Como reportar uma vulnerabilidade
 
-Se você encontrou uma vulnerabilidade no **Fluxo**, por favor:
+Se você encontrou uma vulnerabilidade no **Fluxo**:
 
 - **Não** abra uma issue pública.
-- Entre em contato direto com o mantenedor por e-mail ou mensagem privada (perfil: [Rafael Vieira](https://github.com/RafaelHDSV)).
-- Inclua passos para reproduzir, impacto estimado e, se possível, uma sugestão de correção.
+- Prefira [GitHub Security Advisories](https://github.com/RafaelHDSV/Fluxo/security/advisories/new) (privado) ou contato direto com o mantenedor ([Rafael Vieira](https://github.com/RafaelHDSV)).
+- Inclua: passos para reproduzir, impacto estimado e, se possível, sugestão de correção.
 
-A resposta inicial ocorre em até **7 dias úteis**. Após a correção, você será creditado se desejar.
+Resposta inicial em até **7 dias úteis**. Após a correção, você pode ser creditado se desejar.
 
 ## Escopo
 
@@ -19,18 +19,19 @@ Inclui, entre outros:
 - XSS / CSRF / injeção que afete contas autenticadas
 - Escalação de privilégio no BFF
 
-Fora do escopo típico: negação de serviço trivial em ambiente local de desenvolvimento; questões apenas cosméticas de UI.
+Fora do escopo típico: DoS trivial em ambiente local; questões apenas cosméticas de UI.
 
 ## Versões suportadas
 
-Apenas a versão mais recente da branch principal recebe correções de segurança.
+Apenas a branch principal (`main`) recebe correções de segurança.
 
 ## Boas práticas (contribuidores)
 
 - Nunca commite secrets (`.env`, tokens, chaves privadas, connection strings com credenciais).
-- Use o `.gitignore` do projeto e mantenha apenas `.env.example` com placeholders.
+- Use o `.gitignore` do projeto; mantenha apenas `.env.example` com placeholders.
 - Não imprima valores de `DATABASE_URL`, `JWT_SECRET` ou chaves Supabase em logs de sucesso.
-- Atualize dependências regularmente e prefira PRs pequenos para facilitar revisão.
+- Não versionar dumps, OFX, scripts one-shot com `user_id` real ou IDs de projeto em nuvem.
+- Atualize dependências com PRs pequenos quando possível.
 
 ## Relacionado
 
