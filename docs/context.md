@@ -50,13 +50,13 @@ Envs: `frontend/.env` e `backend/.env` a partir dos `.env.example`. Migrations e
 5. Tailwind + shadcn com tema dark/light
 6. **Entrada de dados mensal:** OFX da conta Santander (Money 2000+); CSV/OFX genérico também
 7. Orçamentos = categorias + metas de gasto; **regras de rename/categoria ficam em Importações**
-8. Investimentos = ex-Metas (`fluxo_goals`) — caixinhas com progresso (CRUD em Investimentos); aporte/resgate via **transferência** com `goal_id` + `goal_direction` — **não** entra em Despesas/Receitas, mas **reduz/aumenta o Saldo do mês** (aporte negativo)
+8. Investimentos = ex-Metas (`fluxo_goals`) — caixinhas com progresso (CRUD em Investimentos); aporte/resgate via **transferência** com `goal_id` + `goal_direction` — **não** entra em Despesas/Receitas; move o saldo da conta (âncora)
 9. Notion foi carga inicial histórica; **não é fonte operacional**
 10. **Saldo das contas** é a âncora (editável; OFX via `LEDGERBAL`). Criar receita/ajuste ou despesa **já paga** no débito ajusta o saldo; transferência ↔ caixinha também move a conta; **marcar/desmarcar pago é só status** (A pagar) e **não** baixa de novo — evita duplicar após importar o extrato. Saldo inicial do mês = saldo atual − movimento de caixa do mês (`date`, despesa débito paga + transferências de caixinha; sem crédito) — **não** a soma histórica do Notion
 11. Importação: preview aplica regras de rename → categoria; **stepper** revisa descrição/categoria das linhas novas antes do commit
 12. **Crédito:** `date` = data da compra; `due_date` = vencimento da fatura (ciclo `closing_day` + `due_day` do cartão). Resultado, orçamentos e filtros de período usam a data efetiva (`coalesce` do vencimento no crédito). Histórico antigo sem `due_date` continua em `date`
 13. **Shell:** sidebar em `lg+`; mobile com nav inferior + sheet “Mais”; `viewport-fit=cover` e safe-area
-14. **Saldo do mês (dashboard)** = receitas (+ mês anterior) − despesas no **débito** pagas + transferências de caixinha (`to_goal` negativo). **Cartão não entra** no saldo (só no card Despesas / categorias)
+14. **Saldo do mês (dashboard, período atual)** = **saldo das contas** (Santander) — mesma âncora de Contas/OFX; não é receitas−despesas
 
 ---
 

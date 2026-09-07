@@ -97,8 +97,12 @@ export function DashboardPage() {
   const goalTransfers = data?.goalTransfers ?? 0
   const debitExpense = data?.debitExpense ?? data?.expense ?? 0
   const receitasTotais = data ? data.income + carryIn : 0
-  // Caixa da corrente: não abate cartão; aportes (goalTransfers < 0) reduzem
-  const saldoMes = data ? receitasTotais - debitExpense + goalTransfers : 0
+  // Período atual: Saldo do mês = saldo das contas (Santander). Fora disso, estima pelo movimento.
+  const saldoMes = data
+    ? data.balancesAnchored
+      ? data.balance
+      : receitasTotais - debitExpense + goalTransfers
+    : 0
   const projectedAfterPayables = saldoMes - unpaidTotal
   const showCarryIn = periodMode !== 'all'
 
@@ -210,9 +214,11 @@ export function DashboardPage() {
               value={formatBRL(saldoMes)}
               tone={saldoMes >= 0 ? 'positive' : 'negative'}
               hint={
-                goalTransfers !== 0
-                  ? `Caixa da conta − aportes${goalTransfers < 0 ? ` (${formatBRL(Math.abs(goalTransfers))})` : ` + resgates (${formatBRL(goalTransfers)})`} · sem cartão`
-                  : 'Receitas − débitos pagos (sem cartão)'
+                data.balancesAnchored
+                  ? 'Saldo atual da conta (Santander)'
+                  : goalTransfers !== 0
+                    ? `Estimativa do período − aportes · sem cartão`
+                    : 'Estimativa: receitas − débitos (sem cartão)'
               }
             />
             <SummaryCard

@@ -121,10 +121,13 @@ router.get('/dashboard', async (req, res) => {
   const debitExpense = toNumber(monthAgg?.debit_expense)
   const adjustments = toNumber(monthAgg?.adjustments)
   const goalTransfers = toNumber(monthAgg?.goal_transfers)
-  // Saldo/resultado de caixa: só conta corrente (débito + aportes). Crédito fica em Despesas, não no saldo.
+  // Movimento do período (informativo). Com âncora atual, o saldo final = saldo das contas.
   const result = income - debitExpense + goalTransfers
-  if (balancesFromAccounts || bounds.period === 'all') {
-    closingBalance = openingBalance + result + adjustments
+  if (balancesFromAccounts) {
+    // Saldo do mês / fechamento = âncora da conta (OFX/LEDGERBAL ou edição manual) — não reconstruir por fórmula
+    closingBalance = accountBalance
+  } else if (bounds.period === 'all') {
+    closingBalance = accountBalance
   }
   const savingsRate = income > 0 ? (result / income) * 100 : 0
 
