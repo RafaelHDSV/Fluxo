@@ -80,7 +80,7 @@ const emptyForm = {
   due_date: '',
   transfer_account_id: '',
   notes: '',
-  paid: false,
+  paid: true,
   payment_method: 'debit' as '' | 'debit' | 'credit',
   goal_id: '',
   goal_direction: 'to_goal' as 'to_goal' | 'from_goal',
@@ -93,6 +93,12 @@ function monthKey(date: string) {
 function formTypeFromUrl(raw: string | null) {
   if (raw === 'income' || raw === 'expense' || raw === 'transfer' || raw === 'adjustment') return raw
   return 'expense'
+}
+
+/** Débito/receita/ajuste: já moveu caixa. Crédito: só ao marcar a fatura paga. */
+function defaultPaidFor(type: string, paymentMethod: string) {
+  if (type !== 'expense') return true
+  return paymentMethod !== 'credit'
 }
 
 function parsePeriodMode(raw: string | null): PeriodMode {
@@ -142,11 +148,16 @@ export function TransactionsPage() {
     const m = Number(searchParams.get('month'))
     return Number.isFinite(m) && m >= 1 && m <= 12 ? m : defaultMonth
   })
-  const [form, setForm] = useState(() => ({
-    ...emptyForm,
-    type: formTypeFromUrl(searchParams.get('type')),
-    paid: formTypeFromUrl(searchParams.get('type')) === 'income' ? true : false,
-  }))
+  const [form, setForm] = useState(() => {
+    const urlType = formTypeFromUrl(searchParams.get('type'))
+    const payment_method = urlType === 'expense' ? ('debit' as const) : emptyForm.payment_method
+    return {
+      ...emptyForm,
+      type: urlType,
+      payment_method,
+      paid: defaultPaidFor(urlType, payment_method || 'debit'),
+    }
+  })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -178,6 +189,11 @@ export function TransactionsPage() {
     () => accounts.filter((a) => a.type === 'credit_card'),
     [accounts],
   )
+  const fundingAccounts = useMemo(
+    () => accounts.filter((a) => a.type !== 'credit_card'),
+    [accounts],
+  )
+  const accountOptions = isCreditForm ? fundingAccounts : accounts
 
   const pageIds = useMemo(() => items.map((t) => t.id), [items])
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
@@ -298,14 +314,20 @@ export function TransactionsPage() {
   useEffect(() => {
     if (editingId) return
     const urlType = formTypeFromUrl(searchParams.get('type'))
-    setForm((f) => ({
-      ...f,
-      type: urlType,
-      paid: urlType === 'income' ? true : f.type === urlType ? f.paid : false,
-      payment_method: urlType === 'expense' ? f.payment_method || 'debit' : '',
-      goal_id: urlType === 'transfer' ? f.goal_id : '',
-      goal_direction: urlType === 'transfer' ? f.goal_direction : 'to_goal',
-    }))
+    setForm((f) => {
+      const payment_method = urlType === 'expense' ? f.payment_method || 'debit' : ''
+      return {
+        ...f,
+        type: urlType,
+        payment_method,
+        paid:
+          f.type === urlType
+            ? f.paid
+            : defaultPaidFor(urlType, payment_method || 'debit'),
+        goal_id: urlType === 'transfer' ? f.goal_id : '',
+        goal_direction: urlType === 'transfer' ? f.goal_direction : 'to_goal',
+      }
+    })
   }, [searchParams, editingId])
 
   function previewDueDate(purchaseDate: string, cardAccountId: string, cardList = creditCards) {
@@ -320,6 +342,7 @@ export function TransactionsPage() {
 
   /** Mantém data/tipo/conta/meio/etc.; limpa só o que costuma mudar entre lançamentos. */
   function formForNextEntry(base: typeof emptyForm) {
+    const payment_method = base.payment_method
     return {
       ...emptyForm,
       date: base.date || todayISO(),
@@ -329,8 +352,8 @@ export function TransactionsPage() {
       card_account_id: base.card_account_id,
       due_date: base.due_date,
       transfer_account_id: base.transfer_account_id,
-      paid: base.type === 'income' ? true : false,
-      payment_method: base.payment_method,
+      paid: defaultPaidFor(base.type, payment_method || 'debit'),
+      payment_method,
       goal_id: base.type === 'transfer' ? base.goal_id : '',
       goal_direction: base.goal_direction,
     }
@@ -578,17 +601,18 @@ export function TransactionsPage() {
                 <Label>Tipo</Label>
                 <Select
                   value={form.type}
-                  onValueChange={(v) =>
+                  onValueChange={(v) => {
+                    const payment_method = v === 'expense' ? form.payment_method || 'debit' : ''
                     setForm({
                       ...form,
                       type: v,
-                      paid: v === 'income' ? true : false,
-                      payment_method: v === 'expense' ? form.payment_method || 'debit' : '',
+                      payment_method,
+                      paid: defaultPaidFor(v, payment_method || 'debit'),
                       goal_id: v === 'transfer' ? form.goal_id : '',
                       goal_direction: v === 'transfer' ? form.goal_direction : 'to_goal',
                       transfer_account_id: v === 'transfer' ? form.transfer_account_id : '',
                     })
-                  }
+                  }}
                 >
                   <SelectTrigger className="h-10">
                     <SelectValue />
@@ -611,9 +635,17 @@ export function TransactionsPage() {
                       const method = v as 'debit' | 'credit'
                       const cardId =
                         method === 'credit' ? form.card_account_id || creditCards[0]?.id || '' : ''
+                      const fundingId =
+                        method === 'credit'
+                          ? fundingAccounts.some((a) => a.id === form.account_id)
+                            ? form.account_id
+                            : fundingAccounts[0]?.id || form.account_id
+                          : form.account_id
                       setForm({
                         ...form,
                         payment_method: method,
+                        paid: defaultPaidFor('expense', method),
+                        account_id: fundingId,
                         card_account_id: cardId,
                         due_date:
                           method === 'credit'
@@ -739,19 +771,24 @@ export function TransactionsPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Conta</Label>
+                <Label>{isCreditForm ? 'Conta que paga' : 'Conta'}</Label>
                 <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
                   <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {accounts.map((a) => (
+                    {accountOptions.map((a) => (
                       <SelectItem key={a.id} value={a.id}>
                         {a.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {isCreditForm && (
+                  <p className="text-xs text-muted-foreground">
+                    Ao marcar a fatura paga, o saldo desta conta é baixado.
+                  </p>
+                )}
               </div>
               {showGoalSelect && (
                 <>
@@ -815,7 +852,7 @@ export function TransactionsPage() {
                     onCheckedChange={(c) => setForm({ ...form, paid: c === true })}
                   />
                   <Label htmlFor="tx-paid" className="cursor-pointer">
-                    Pago
+                    {isCreditForm ? 'Fatura paga (baixa a conta)' : 'Pago (baixa a conta)'}
                   </Label>
                 </div>
               )}

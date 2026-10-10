@@ -324,16 +324,21 @@ export function PayablesPage() {
                   {formatBRL(totals.credit)}
                 </p>
                 {creditItems.length > 0 && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="w-full sm:w-auto"
-                    disabled={bulkBusy}
-                    onClick={() => void markAllCreditPaid()}
-                  >
-                    Marcar fatura paga ({creditItems.length})
-                  </Button>
+                  <div className="space-y-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                      disabled={bulkBusy}
+                      onClick={() => void markAllCreditPaid()}
+                    >
+                      Marcar fatura paga ({creditItems.length})
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Baixa o saldo da conta vinculada a cada compra (sem OFX).
+                    </p>
+                  </div>
                 )}
               </>
             )}

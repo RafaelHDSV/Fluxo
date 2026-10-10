@@ -27,14 +27,14 @@
 
 ## 💡 O que é
 
-Controle financeiro **individual**: contas, lançamentos, importação de extrato (OFX Santander + CSV), orçamentos, caixinhas, a pagar, dashboard e relatórios.
+Controle financeiro **individual**: contas, lançamentos manuais, orçamentos, caixinhas, a pagar, dashboard e relatórios (importação CSV/OFX opcional/legado).
 
 Autenticação Supabase, dados isolados por usuário (RLS), moeda **BRL**.
 
 | | |
 |:--|:--|
 | 🚨 **Problema** | Planilha e apps genéricos não batem com o extrato do banco nem com a fatura do cartão. |
-| 🎯 **Abordagem** | O **saldo da conta** é a âncora; OFX atualiza; cartão usa data de compra **e** vencimento. |
+| 🎯 **Abordagem** | O **saldo da conta** é a âncora; lançamento pago move o caixa; cartão usa compra **e** vencimento. |
 | 🚫 **Fora de escopo** | Open Finance (custo de agregador) — entrada principal = arquivo que você exporta. |
 
 ---
@@ -66,9 +66,9 @@ Autenticação Supabase, dados isolados por usuário (RLS), moeda **BRL**.
 
 ## 🎯 Por que assim
 
-- ⚓ **Saldo das contas** é a âncora (editável; OFX pode gravar `LEDGERBAL`)
+- ⚓ **Saldo das contas** é a âncora (editável; lançamento pago move o saldo)
 - 📊 No dashboard (período atual), o **Saldo do mês** espelha essa âncora — não é “receitas − despesas”
-- 📄 Entrada mensal principal: **OFX do Santander** (CSV/OFX genérico de apoio)
+- ✍️ Entrada principal: **lançamento manual** (CSV/OFX legado, se ainda tiver extrato)
 - 💳 No cartão, **compra** e **vencimento** são datas diferentes; períodos usam o vencimento
 - 🚫 Open Finance fica de fora de propósito
 
@@ -82,20 +82,20 @@ Autenticação Supabase, dados isolados por usuário (RLS), moeda **BRL**.
 
 ### 🏦 Contas e saldo
 - Contas de débito e cartão de crédito
-- Saldo âncora; OFX pode gravar `LEDGERBAL`
+- Saldo âncora; marcar pago (débito/fatura) baixa a conta
 - Cartão: fechamento + vencimento da fatura
 
 ### 💳 Transações
 - Receita, despesa, **transferência** e ajuste
-- **Marcar pago** = só status (não move saldo de novo)
-- Crédito: data da compra + vencimento
+- **Marcar pago** move o saldo da conta de pagamento
+- Crédito: data da compra + vencimento; fatura paga baixa a corrente
 - Transferência ↔ **caixinha** (aporte/resgate)
 
 </td>
 <td width="50%" valign="top">
 
 ### 📥 Importações
-- OFX Santander (Money 2000+) e CSV/OFX genérico
+- Importação legado: CSV/OFX genérico
 - Regras de renomeação e categorização
 - Preview + stepper antes de gravar
 
@@ -198,7 +198,7 @@ yarn dev
 | Frontend | http://localhost:3333 |
 | API (BFF) | http://localhost:3693 |
 
-Crie a conta no registro, cadastre as contas (saldo) e, se quiser, importe o OFX.
+Crie a conta no registro, cadastre as contas (saldo) e lance as transações na mão.
 
 ### 🧪 Scripts úteis
 
@@ -240,8 +240,8 @@ Um projeto serve o **SPA** e o **BFF** em `/api/*`.
 | Moeda | BRL apenas |
 | Open Finance | Fora de escopo |
 | Saldo | Âncora = `fluxo_accounts.balance`; período atual no dashboard usa essa âncora |
-| Pago | Toggle de despesa = status; não reaplica delta de caixa |
-| Crédito | Entra em despesas/orçamentos pela data efetiva; não move corrente até pagar a fatura |
+| Pago | Toggle de despesa reaplica delta de caixa (fluxo manual sem OFX) |
+| Crédito | Entra em despesas/orçamentos pela data efetiva; pagar a fatura baixa a conta de pagamento |
 | Caixinhas | Aporte/resgate via transferência + `goal_id` / `goal_direction` |
 
 Mudanças nessas regras: discuta na issue antes de implementar.

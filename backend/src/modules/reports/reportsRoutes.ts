@@ -66,21 +66,19 @@ router.get('/dashboard', async (req, res) => {
     openingBalance = 0
     closingBalance = accountBalance
   } else if (periodIncludesToday) {
-    // Saldo inicial = saldo atual das contas − movimento de caixa do período.
-    // Usa `date` (não vencimento do crédito): cartão não mexe na conta corrente.
-    // Mesma janela do card de despesas do mês (`from`→`to`), para bater com o total exibido.
+    // Saldo inicial = saldo atual − movimento de caixa do período (data efetiva).
+    // Despesa paga (débito ou crédito) baixa a conta de pagamento (`account_id`).
     const cashNet = await queryOne<{ sum: string }>(
       `select coalesce(sum(case
          when type = 'income' then amount
          when type = 'adjustment' then amount
-         when type = 'expense' and paid = true
-           and coalesce(payment_method, 'debit') <> 'credit' then -amount
+         when type = 'expense' and paid = true then -amount
          when type = 'transfer' and goal_id is not null
            and coalesce(goal_direction, 'to_goal') = 'from_goal' then amount
          when type = 'transfer' and goal_id is not null then -amount
          else 0 end), 0) as sum
        from ${T.transactions}
-       where user_id = $1 and date between $2::date and $3::date`,
+       where user_id = $1 and ${EFF} between $2::date and $3::date`,
       [userId, from, to],
     )
     openingBalance = accountBalance - toNumber(cashNet?.sum)
@@ -122,7 +120,7 @@ router.get('/dashboard', async (req, res) => {
   const adjustments = toNumber(monthAgg?.adjustments)
   const goalTransfers = toNumber(monthAgg?.goal_transfers)
   // Movimento do período (informativo). Com âncora atual, o saldo final = saldo das contas.
-  const result = income - debitExpense + goalTransfers
+  const result = income - expense + goalTransfers
   if (balancesFromAccounts) {
     // Saldo do mês / fechamento = âncora da conta (OFX/LEDGERBAL ou edição manual) — não reconstruir por fórmula
     closingBalance = accountBalance
@@ -162,8 +160,7 @@ router.get('/dashboard', async (req, res) => {
        select (${EFF})::date as d,
          coalesce(sum(case
            when type = 'income' then amount
-           when type = 'expense' and paid = true
-             and coalesce(payment_method, 'debit') <> 'credit' then -amount
+           when type = 'expense' and paid = true then -amount
            when type = 'adjustment' then amount
            when type = 'transfer' and goal_id is not null
              and coalesce(goal_direction, 'to_goal') = 'from_goal' then amount

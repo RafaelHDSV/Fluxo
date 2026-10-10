@@ -1,5 +1,8 @@
 import { Router } from 'express'
-import { applyAccountBalanceDelta, checkingCashDelta } from '../../lib/accountCash.js'
+import {
+  applyFundingBalanceDelta,
+  checkingCashDelta,
+} from '../../lib/accountCash.js'
 import { computeCreditDueDate, effectiveDateSql } from '../../lib/creditCycle.js'
 import { query, queryOne } from '../../lib/db.js'
 import {
@@ -361,12 +364,12 @@ router.post('/', async (req, res) => {
         resolvedGoalDirection,
       ],
     )
-    await applyAccountBalanceDelta(req.userId!, account_id, cashDelta)
+    await applyFundingBalanceDelta(req.userId!, account_id, cashDelta)
     if (gDelta !== 0 && resolvedGoalId && row) {
       const r = await applyGoalAmountDelta(req.userId!, resolvedGoalId, gDelta)
       if (!r.ok) {
         await queryOne(`delete from ${T.transactions} where id = $1 and user_id = $2`, [row.id, req.userId])
-        await applyAccountBalanceDelta(req.userId!, account_id, -cashDelta)
+        await applyFundingBalanceDelta(req.userId!, account_id, -cashDelta)
         return res.status(400).json({ error: r.error })
       }
     }
@@ -487,7 +490,7 @@ router.put('/:id', async (req, res) => {
   const newCash = accountCashDelta({
     type,
     amount,
-    paid: existing.paid,
+    paid,
     paymentMethod: payment_method,
     goalId: newGoalId,
     goalDirection: newGoalDirection,
@@ -658,10 +661,10 @@ router.put('/:id', async (req, res) => {
 
   // Reverte efeito antigo e aplica o novo (conta pode ter mudado)
   if (existing.account_id === account_id) {
-    await applyAccountBalanceDelta(req.userId!, account_id, newCash - oldCash)
+    await applyFundingBalanceDelta(req.userId!, account_id, newCash - oldCash)
   } else {
-    await applyAccountBalanceDelta(req.userId!, existing.account_id, -oldCash)
-    await applyAccountBalanceDelta(req.userId!, account_id, newCash)
+    await applyFundingBalanceDelta(req.userId!, existing.account_id, -oldCash)
+    await applyFundingBalanceDelta(req.userId!, account_id, newCash)
   }
 
   res.json(row)
@@ -726,7 +729,7 @@ router.delete('/:id', async (req, res) => {
     req.params.id,
     req.userId,
   ])
-  await applyAccountBalanceDelta(req.userId!, existing.account_id, -cashDelta)
+  await applyFundingBalanceDelta(req.userId!, existing.account_id, -cashDelta)
   res.status(204).send()
 })
 
@@ -793,7 +796,7 @@ router.post('/bulk-delete', async (req, res) => {
   )
   for (const row of existing) {
     const goalDir = row.goal_id ? normalizeGoalDirection(row.goal_direction) : null
-    await applyAccountBalanceDelta(
+    await applyFundingBalanceDelta(
       req.userId!,
       row.account_id,
       -accountCashDelta({
@@ -823,7 +826,22 @@ router.post('/bulk-paid', async (req, res) => {
     return res.status(400).json({ error: 'ids inválidos' })
   }
 
-  // Só status — não aplica delta de saldo (OFX/LEDGERBAL ou criar já pago cuidam do caixa).
+  const existing = await query<{
+    id: string
+    type: string
+    amount: string
+    paid: boolean
+    payment_method: string | null
+    account_id: string
+    goal_id: string | null
+    goal_direction: string | null
+  }>(
+    `select id, type, amount, paid, payment_method, account_id, goal_id, goal_direction
+     from ${T.transactions}
+     where user_id = $1 and id = any($2::uuid[]) and type = 'expense'`,
+    [req.userId, cleaned],
+  )
+
   const updated = await query<{ id: string }>(
     `update ${T.transactions}
      set paid = $3, updated_at = now()
@@ -831,6 +849,29 @@ router.post('/bulk-paid', async (req, res) => {
      returning id`,
     [req.userId, cleaned, paid],
   )
+
+  // Fluxo manual: marcar pago/não pago move a conta de pagamento (débito e fatura de crédito).
+  for (const row of existing) {
+    if (row.paid === paid) continue
+    const goalDir = row.goal_id ? normalizeGoalDirection(row.goal_direction) : null
+    const oldCash = accountCashDelta({
+      type: row.type,
+      amount: toNumber(row.amount),
+      paid: row.paid,
+      paymentMethod: row.payment_method,
+      goalId: row.goal_id,
+      goalDirection: goalDir,
+    })
+    const newCash = accountCashDelta({
+      type: row.type,
+      amount: toNumber(row.amount),
+      paid,
+      paymentMethod: row.payment_method,
+      goalId: row.goal_id,
+      goalDirection: goalDir,
+    })
+    await applyFundingBalanceDelta(req.userId!, row.account_id, newCash - oldCash)
+  }
 
   res.json({ updated: updated.length })
 })
