@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { AuthShell } from '@/components/auth/AuthShell'
 import { Layout } from '@/components/Layout'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AuthProvider, useAuth } from '@/hooks/useAuth'
@@ -35,8 +36,16 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route
+          element={
+            <AuthShell>
+              <Outlet />
+            </AuthShell>
+          }
+        >
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
         <Route
           element={
             <Protected>

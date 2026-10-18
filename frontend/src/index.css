@@ -39,6 +39,7 @@
   --warning: #e6b450;
   --border: #2e3a48;
   --ring: #3ddc97;
+  --auth-panel: #0c1116;
   --radius: 12px;
   --radius-sm: 8px;
 }
@@ -58,6 +59,7 @@
   --warning: #c48a16;
   --border: #d5dee8;
   --ring: #0f9f6e;
+  --auth-panel: #eef3f8;
   --radius: 12px;
   --radius-sm: 8px;
 }
@@ -128,5 +130,21 @@
     #bmc-wbtn {
       bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
     }
+  }
+}
+
+@layer utilities {
+  .mineral-noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  }
+}
+
+/* Auth panel: tab progress bar; its end drives the slide advance. */
+@keyframes auth-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
   }
 }

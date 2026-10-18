@@ -1,9 +1,8 @@
 import { FormEvent, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
+import { ArrowRight, Lock, Mail, User } from 'lucide-react'
+import { AuthField } from '@/components/auth/AuthField'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/useAuth'
 
 export function RegisterPage() {
@@ -33,65 +32,82 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md border-border bg-surface">
-        <CardHeader className="space-y-4">
-          <div className="flex items-center gap-3">
-            <img src="/logo.svg" alt="Fluxo" width={44} height={44} />
-            <div>
-              <CardTitle className="font-display text-2xl">Criar conta</CardTitle>
-              <CardDescription>Comece a organizar seu fluxo.</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="reg-name">Nome</Label>
-              <Input
-                id="reg-name"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                autoComplete="name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="reg-email">E-mail</Label>
-              <Input
-                id="reg-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="reg-password">Senha</Label>
-              <Input
-                id="reg-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                autoComplete="new-password"
-              />
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            {ok && <p className="text-sm text-primary">{ok}</p>}
-            <Button type="submit" className="w-full" disabled={pending || !configured}>
-              {pending ? 'Criando…' : 'Cadastrar'}
-            </Button>
-          </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Já tem conta?{' '}
-            <Link to="/login" className="text-primary hover:underline">
-              Entrar
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <>
+      <header className="shrink-0 space-y-2">
+        <h1 className="font-display text-3xl font-semibold leading-tight tracking-tight sm:text-[2rem]">
+          Criar conta
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Comece a organizar seu fluxo com e-mail e senha.
+        </p>
+      </header>
+
+      {!configured && (
+        <p className="shrink-0 text-sm text-destructive">
+          Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no frontend/.env
+        </p>
+      )}
+
+      <form className="shrink-0 space-y-4" onSubmit={onSubmit} autoComplete="on">
+        <AuthField
+          id="reg-name"
+          label="Nome"
+          icon={User}
+          name="name"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          onInput={(e) => setDisplayName(e.currentTarget.value)}
+          autoComplete="name"
+          placeholder="Como quer ser chamado"
+        />
+        <AuthField
+          id="reg-email"
+          label="E-mail"
+          icon={Mail}
+          name="email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onInput={(e) => setEmail(e.currentTarget.value)}
+          required
+          autoComplete="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder="voce@exemplo.com"
+        />
+        <AuthField
+          id="reg-password"
+          label="Senha"
+          icon={Lock}
+          reveal
+          name="password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onInput={(e) => setPassword(e.currentTarget.value)}
+          required
+          minLength={6}
+          autoComplete="new-password"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder="Mínimo 6 caracteres"
+        />
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {ok ? <p className="text-sm text-primary">{ok}</p> : null}
+        <Button type="submit" className="w-full" disabled={pending || !configured}>
+          {pending ? 'Criando…' : 'Cadastrar'}
+          {pending ? null : <ArrowRight aria-hidden className="size-4" />}
+        </Button>
+      </form>
+
+      <p className="shrink-0 text-center text-sm text-muted-foreground">
+        Já tem conta?{' '}
+        <Link to="/login" className="font-medium text-primary underline-offset-4 hover:underline">
+          Entrar
+        </Link>
+      </p>
+    </>
   )
 }
