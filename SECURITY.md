@@ -1,39 +1,23 @@
-# Política de segurança
+# Politica de seguranca
 
 ## Como reportar uma vulnerabilidade
 
-Se você encontrou uma vulnerabilidade no **Fluxo**:
+Se voce encontrou uma vulnerabilidade em **Fluxo**, por favor:
 
-- **Não** abra uma issue pública.
-- Prefira [GitHub Security Advisories](https://github.com/RafaelHDSV/Fluxo/security/advisories/new) (privado) ou contato direto com o mantenedor ([Rafael Vieira](https://github.com/RafaelHDSV)).
-- Inclua: passos para reproduzir, impacto estimado e, se possível, sugestão de correção.
+- **Nao** abra uma issue publica.
+- Escreva para **rafaelvieira1720@gmail.com** com o assunto `[Fluxo] Seguranca`.
+- Inclua passos para reproduzir, impacto e, se possivel, uma sugestao de correcao.
 
-Resposta inicial em até **7 dias úteis**. Após a correção, você pode ser creditado se desejar.
+A resposta inicial ocorre em ate 5 dias uteis. Apos a correcao, voce sera creditado se desejar.
 
-## Escopo
+Pedidos sobre dados pessoais (acesso, correcao, exclusao) vao para o mesmo e-mail, com resposta em ate 15 dias.
 
-Inclui, entre outros:
+## Versoes suportadas
 
-- Exposição de dados financeiros de outro usuário (falha de RLS / Auth)
-- Vazamento de secrets no repositório ou em logs
-- XSS / CSRF / injeção que afete contas autenticadas
-- Escalação de privilégio no BFF
+Apenas a versao mais recente recebe correcoes de seguranca.
 
-Fora do escopo típico: DoS trivial em ambiente local; questões apenas cosméticas de UI.
+## Boas praticas
 
-## Versões suportadas
-
-Apenas a branch principal (`main`) recebe correções de segurança.
-
-## Boas práticas (contribuidores)
-
-- Nunca commite secrets (`.env`, tokens, chaves privadas, connection strings com credenciais).
-- Use o `.gitignore` do projeto; mantenha apenas `.env.example` com placeholders.
-- Não imprima valores de `DATABASE_URL`, `JWT_SECRET` ou chaves Supabase em logs de sucesso.
-- Não versionar dumps, OFX, scripts one-shot com `user_id` real ou IDs de projeto em nuvem.
-- Atualize dependências com PRs pequenos quando possível.
-
-## Relacionado
-
-- [Código de Conduta](./CODE_OF_CONDUCT.md)
-- [Contribuindo](./CONTRIBUTING.md)
+- Nunca commite secrets (`.env`, tokens, chaves privadas).
+- Use o `.gitignore` do projeto como base.
+- Atualize dependencias regularmente.

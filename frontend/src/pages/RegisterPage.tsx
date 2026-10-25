@@ -1,9 +1,11 @@
 import { FormEvent, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { ArrowRight, Lock, Mail, User } from 'lucide-react'
+import { TermsAcceptance } from '@vieira/institucional'
 import { AuthField } from '@/components/auth/AuthField'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
+import { institucionalConfig } from '@/institucional.config'
 
 export function RegisterPage() {
   const { signUp, user, configured, loading } = useAuth()
@@ -13,6 +15,8 @@ export function RegisterPage() {
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
   const [pending, setPending] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [termsError, setTermsError] = useState<string | null>(null)
 
   if (!loading && user) return <Navigate to="/" replace />
 
@@ -20,9 +24,14 @@ export function RegisterPage() {
     e.preventDefault()
     setError('')
     setOk('')
+    setTermsError(null)
+    if (!termsAccepted) {
+      setTermsError('Marque o aceite para criar a conta.')
+      return
+    }
     setPending(true)
     try {
-      await signUp(email, password, displayName)
+      await signUp(email, password, displayName, institucionalConfig.legalVersion)
       setOk('Conta criada. Se o e-mail precisar confirmação, verifique sua caixa de entrada.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha no cadastro')
@@ -93,6 +102,11 @@ export function RegisterPage() {
           autoCorrect="off"
           spellCheck={false}
           placeholder="Mínimo 6 caracteres"
+        />
+        <TermsAcceptance
+          checked={termsAccepted}
+          onChange={setTermsAccepted}
+          error={termsError}
         />
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {ok ? <p className="text-sm text-primary">{ok}</p> : null}

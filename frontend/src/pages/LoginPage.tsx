@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { ArrowRight, Lock, Mail } from 'lucide-react'
 import { AuthField } from '@/components/auth/AuthField'
 import { Button } from '@/components/ui/button'
@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 
 export function LoginPage() {
   const { signIn, user, configured, loading } = useAuth()
+  const notice = (useLocation().state as { notice?: string } | null)?.notice
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -38,6 +39,7 @@ export function LoginPage() {
         </p>
       </header>
 
+      {notice ? <p className="shrink-0 text-sm text-primary">{notice}</p> : null}
       {!configured && (
         <p className="shrink-0 text-sm text-destructive">
           Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no frontend/.env

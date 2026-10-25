@@ -11,6 +11,7 @@ import {
   Moon,
   Sun,
   MoreHorizontal,
+  UserRound,
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useEffect, useState } from 'react'
@@ -32,6 +33,7 @@ const links = [
   { to: '/investments', label: 'Investimentos', icon: TrendingUp },
   { to: '/wishlist', label: 'Wishlist', icon: Heart },
   { to: '/reports', label: 'Relatórios', icon: BarChart3 },
+  { to: '/conta', label: 'Conta', icon: UserRound },
 ]
 
 const mobilePrimary = ['/', '/transactions', '/a-pagar', '/accounts', '/more'] as const
