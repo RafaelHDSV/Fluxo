@@ -50,7 +50,15 @@ export function accountRepo(userId: string) {
         'SELECT public.vieira_export_app_data($1, $2) AS data',
         [APP, userId],
       )
-      return row?.data ?? null
+      const profile = await queryOne<Record<string, unknown>>(
+        'SELECT id, display_name, created_at FROM fluxo_profiles WHERE id = $1',
+        [userId],
+      )
+      const data = row?.data
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        return { ...(data as Record<string, unknown>), fluxo_profiles: profile }
+      }
+      return { exported: data ?? null, fluxo_profiles: profile }
     },
 
     async deleteData(protectedEmails: string[]): Promise<{ authUserDeleted: boolean }> {
@@ -58,6 +66,7 @@ export function accountRepo(userId: string) {
         'SELECT public.vieira_delete_app_data($1, $2, $3) AS result',
         [APP, userId, protectedEmails],
       )
+      await query('DELETE FROM fluxo_profiles WHERE id = $1', [userId])
       return { authUserDeleted: Boolean(row?.result?.auth_user_deleted) }
     },
   }

@@ -4,6 +4,7 @@ import { PROTECTED_EMAILS } from '../../globals/Config.js'
 import { requireAuth } from '../../middleware/auth.js'
 import { sendDeletionEmail } from '../../services/account/sendDeletionEmail.js'
 import { verifySupabasePassword } from '../../services/account/verifyPassword.js'
+import { inspectDeleteMe } from './deleteMe.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -65,26 +66,20 @@ router.get('/me/export', async (req, res, next) => {
 
 router.delete('/me', async (req, res, next) => {
   try {
-    if (!req.userId) return res.status(401).json({ error: 'Token ausente' })
-    const email = req.email ?? null
-    const password = req.body?.password
+    const inspected = inspectDeleteMe({
+      userId: req.userId,
+      email: req.email ?? null,
+      password: req.body?.password,
+      protectedEmails: PROTECTED_EMAILS,
+    })
+    if (!inspected.ok) return res.status(inspected.status).json({ error: inspected.error })
 
-    if (typeof password !== 'string' || password.length === 0) {
-      return res.status(400).json({ error: 'password_required' })
-    }
-    if (!email) {
-      return res.status(400).json({ error: 'email_unavailable' })
-    }
-    if (PROTECTED_EMAILS.includes(email.toLowerCase())) {
-      return res.status(403).json({ error: 'protected_account' })
-    }
-
-    if (!(await verifySupabasePassword(email, password))) {
+    if (!(await verifySupabasePassword(inspected.email, inspected.password))) {
       return res.status(401).json({ error: 'invalid_password' })
     }
 
     try {
-      await accountRepo(req.userId).deleteData(PROTECTED_EMAILS)
+      await accountRepo(inspected.userId).deleteData(PROTECTED_EMAILS)
     } catch (error) {
       if (error instanceof Error && error.message.includes('protected_account')) {
         return res.status(403).json({ error: 'protected_account' })
@@ -92,7 +87,7 @@ router.delete('/me', async (req, res, next) => {
       throw error
     }
 
-    await sendDeletionEmail(email)
+    await sendDeletionEmail(inspected.email)
     return res.json({ message: DELETED_MESSAGE })
   } catch (error) {
     next(error)
