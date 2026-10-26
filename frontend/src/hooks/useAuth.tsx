@@ -16,7 +16,7 @@ type AuthContextValue = {
   loading: boolean
   configured: boolean
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string, displayName?: string) => Promise<void>
+  signUp: (email: string, password: string, displayName?: string, legalVersion?: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -46,14 +46,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error
   }, [])
 
-  const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { display_name: displayName } },
-    })
-    if (error) throw error
-  }, [])
+  const signUp = useCallback(
+    async (email: string, password: string, displayName?: string, legalVersion?: string) => {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            display_name: displayName,
+            ...(legalVersion
+              ? {
+                  vieira_legal: {
+                    fluxo: { version: legalVersion, accepted_at: new Date().toISOString() },
+                  },
+                }
+              : {}),
+          },
+        },
+      })
+      if (error) throw error
+    },
+    [],
+  )
 
   const signOut = useCallback(async () => {
     const { error } = await supabase.auth.signOut()

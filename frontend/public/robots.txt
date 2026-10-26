@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /login
+Allow: /register
+Allow: /privacidade
+Allow: /termos
+Disallow: /transactions
+Disallow: /a-pagar
+Disallow: /wishlist
+Disallow: /imports
+Disallow: /accounts
+Disallow: /conta
+Disallow: /budgets
+Disallow: /investments
+Disallow: /reports
+Disallow: /api/
+
+Sitemap: https://fluxo-vieira.vercel.app/sitemap.xml

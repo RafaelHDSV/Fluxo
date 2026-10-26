@@ -3,9 +3,13 @@ import { AuthShell } from '@/components/auth/AuthShell'
 import { Layout } from '@/components/Layout'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AuthProvider, useAuth } from '@/hooks/useAuth'
+import { NotFoundPage } from '@vieira/institucional'
+import LegalGateHost from '@/components/LegalGateHost'
+import { AccountPage } from '@/pages/AccountPage'
 import { AccountsPage } from '@/pages/AccountsPage'
 import { BudgetsPage } from '@/pages/BudgetsPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import LegalRoute from '@/pages/LegalRoute'
 import { InvestmentsPage } from '@/pages/InvestmentsPage'
 import { ImportsPage } from '@/pages/ImportsPage'
 import { LoginPage } from '@/pages/LoginPage'
@@ -46,10 +50,14 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
         </Route>
+        <Route path="/privacidade" element={<LegalRoute kind="privacy" />} />
+        <Route path="/termos" element={<LegalRoute kind="terms" />} />
         <Route
           element={
             <Protected>
-              <Layout />
+              <LegalGateHost>
+                <Layout />
+              </LegalGateHost>
             </Protected>
           }
         >
@@ -59,12 +67,13 @@ export default function App() {
           <Route path="wishlist" element={<WishlistPage />} />
           <Route path="imports" element={<ImportsPage />} />
           <Route path="accounts" element={<AccountsPage />} />
+          <Route path="conta" element={<AccountPage />} />
           <Route path="budgets" element={<BudgetsPage />} />
           <Route path="investments" element={<InvestmentsPage />} />
           <Route path="goals" element={<Navigate to="/investments" replace />} />
           <Route path="reports" element={<ReportsPage />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AuthProvider>
   )

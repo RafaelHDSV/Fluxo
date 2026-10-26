@@ -12,6 +12,7 @@ import goalsRoutes from './modules/goals/goalsRoutes.js'
 import reportsRoutes from './modules/reports/reportsRoutes.js'
 import wishlistRoutes from './modules/wishlist/wishlistRoutes.js'
 import descriptionRulesRoutes from './modules/descriptionRules/descriptionRulesRoutes.js'
+import meRoutes from './modules/me/meRoutes.js'
 
 export function createApp() {
   const app = express()
@@ -42,10 +43,16 @@ export function createApp() {
   app.use('/api/goals', goalsRoutes)
   app.use('/api/wishlist', wishlistRoutes)
   app.use('/api/reports', reportsRoutes)
+  app.use('/api/v1', meRoutes)
 
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    console.error('Unhandled error', error instanceof Error ? error.message : 'unknown')
-    res.status(500).json({ error: 'Erro interno' })
+    const status =
+      error && typeof error === 'object' && 'status' in error && typeof (error as { status: unknown }).status === 'number'
+        ? (error as { status: number }).status
+        : 500
+    const message = error instanceof Error ? error.message : 'unknown'
+    if (status >= 500) console.error('Unhandled error', message)
+    res.status(status).json({ error: status >= 500 ? 'Erro interno' : message })
   })
 
   return app

@@ -64,6 +64,21 @@
   --radius-sm: 8px;
 }
 
+:root {
+  /* @vieira/institucional: seguir o tema do app (.light / .dark), não prefers-color-scheme */
+  --vi-font: inherit;
+  --vi-fg: var(--foreground);
+  --vi-muted: var(--muted-foreground);
+  --vi-bg: var(--background);
+  --vi-surface: var(--surface);
+  --vi-border: var(--border);
+  --vi-accent: var(--primary);
+  --vi-accent-fg: var(--primary-foreground);
+  --vi-danger: var(--destructive);
+  --vi-danger-fg: var(--primary-foreground);
+  --vi-radius: var(--radius);
+}
+
 @layer base {
   * {
     @apply border-border;

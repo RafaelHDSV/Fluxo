@@ -29,6 +29,8 @@ dist-ssr
 !vendor/vieira-analytics/dist/**
 !frontend/vendor/vieira-analytics/dist/
 !frontend/vendor/vieira-analytics/dist/**
+!frontend/vendor/vieira-institucional/dist/
+!frontend/vendor/vieira-institucional/dist/**
 *.local
 
 # Editor directories and files
