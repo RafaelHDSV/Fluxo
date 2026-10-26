@@ -14,7 +14,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
@@ -38,7 +38,35 @@ const links = [
 
 const mobilePrimary = ['/', '/transactions', '/a-pagar', '/accounts', '/more'] as const
 
-export function Layout() {
+function LegalLinks({
+  onNavigate,
+  className,
+}: {
+  onNavigate?: () => void
+  className?: string
+}) {
+  return (
+    <nav
+      aria-label="Documentos legais"
+      className={cn(
+        'flex items-center gap-1.5 text-[11px] leading-none text-muted-foreground',
+        className,
+      )}
+    >
+      <NavLink to="/privacidade" onClick={onNavigate} className="hover:text-foreground">
+        Privacidade
+      </NavLink>
+      <span aria-hidden className="text-border">
+        ·
+      </span>
+      <NavLink to="/termos" onClick={onNavigate} className="hover:text-foreground">
+        Termos
+      </NavLink>
+    </nav>
+  )
+}
+
+export function Layout({ children }: { children?: ReactNode } = {}) {
   const { user, signOut } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [moreOpen, setMoreOpen] = useState(false)
@@ -97,11 +125,12 @@ export function Layout() {
           <Button type="button" variant="secondary" className="w-full" onClick={() => setLogoutOpen(true)}>
             Sair
           </Button>
+          <LegalLinks className="px-0.5 pt-1" />
         </div>
       </aside>
 
       <main className="min-h-screen min-w-0 flex-1 overflow-y-auto px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 lg:px-8 lg:pb-8 lg:pt-8">
-        <Outlet />
+        {children ?? <Outlet />}
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
@@ -173,6 +202,7 @@ export function Layout() {
               <Button type="button" variant="secondary" onClick={() => setLogoutOpen(true)}>
                 Sair
               </Button>
+              <LegalLinks onNavigate={() => setMoreOpen(false)} className="px-1 pt-2" />
             </div>
           </div>
         </div>

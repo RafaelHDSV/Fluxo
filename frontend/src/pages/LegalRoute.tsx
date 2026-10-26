@@ -1,4 +1,5 @@
 import { LegalPage } from '@vieira/institucional'
+import { Layout } from '@/components/Layout'
 import { useAuth } from '@/hooks/useAuth'
 
 export default function LegalRoute({ kind }: { kind: 'privacy' | 'terms' }) {
@@ -8,5 +9,7 @@ export default function LegalRoute({ kind }: { kind: 'privacy' | 'terms' }) {
     return <div className="min-h-dvh bg-background" />
   }
 
-  return <LegalPage kind={kind} embedded={Boolean(user)} />
+  const page = <LegalPage kind={kind} embedded={Boolean(user)} />
+  if (user) return <Layout>{page}</Layout>
+  return page
 }
