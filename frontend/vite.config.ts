@@ -4,7 +4,7 @@ import { sentryVitePlugin } from '@sentry/vite-plugin'
 import path from 'path'
 import { defineConfig, loadEnv } from 'vite'
 
-const PUBLIC_URL_FALLBACK = 'https://fluxo-vieira.vercel.app'
+const PUBLIC_URL_FALLBACK = 'https://fluxo.getvieira.com'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')

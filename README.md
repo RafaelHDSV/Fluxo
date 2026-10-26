@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://fluxo-vieira.vercel.app/"><img src="https://img.shields.io/badge/demo-ao_vivo-22c55e?style=flat-square" alt="Demo ao vivo" /></a>
+  <a href="https://fluxo.getvieira.com/"><img src="https://img.shields.io/badge/demo-ao_vivo-22c55e?style=flat-square" alt="Demo ao vivo" /></a>
   <a href="https://github.com/RafaelHDSV/Fluxo"><img src="https://img.shields.io/badge/GitHub-RafaelHDSV%2FFluxo-181717?style=flat-square&logo=github" alt="GitHub" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT" /></a>
   <img src="https://img.shields.io/badge/stack-React%20%7C%20Express%20%7C%20Supabase-0ea5e9?style=flat-square" alt="Stack" />
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://fluxo-vieira.vercel.app/"><b>Abrir app</b></a>
+  <a href="https://fluxo.getvieira.com/"><b>Abrir app</b></a>
   ·
   <a href="#preview">Preview</a>
   ·
