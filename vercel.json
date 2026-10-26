@@ -10,6 +10,14 @@
       "memory": 1024
     }
   },
+  "redirects": [
+    {
+      "source": "/((?!api(?:/|$)|health$).*)",
+      "has": [{ "type": "host", "value": "fluxo-vieira.vercel.app" }],
+      "destination": "https://fluxo.getvieira.com/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/health", "destination": "/api" },
