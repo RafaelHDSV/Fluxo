@@ -24,7 +24,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   try {
-    let payload: { sub?: string }
+    let payload: { sub?: string; email?: unknown }
 
     if (SUPABASE_JWT_SECRET) {
       const secret = new TextEncoder().encode(SUPABASE_JWT_SECRET)
@@ -47,6 +47,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     req.userId = payload.sub
     req.accessToken = token
+    req.email = typeof payload.email === 'string' ? payload.email : undefined
     return next()
   } catch {
     return res.status(401).json({ error: 'Token inválido ou expirado' })

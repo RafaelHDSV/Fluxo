@@ -1,3 +1,4 @@
+import { SiteFooter } from '@vieira/institucional'
 import { AuthPresentation } from '@/components/auth/AuthPresentation'
 import { authPresentation } from '@/config/authPresentation'
 import { useTheme } from '@/hooks/useTheme'
@@ -43,6 +44,7 @@ export function AuthShell({ children }: AuthShellProps) {
         </div>
 
         <p className="shrink-0 text-center text-xs text-muted-foreground lg:hidden">{cfg.tagline}</p>
+        <SiteFooter className="shrink-0 border-0 px-0 pb-0 pt-3 text-xs" />
       </aside>
 
       <AuthPresentation />

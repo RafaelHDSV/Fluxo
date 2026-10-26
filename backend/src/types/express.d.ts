@@ -5,6 +5,7 @@ declare global {
     interface Request {
       userId?: string
       accessToken?: string
+      email?: string
     }
   }
 }
