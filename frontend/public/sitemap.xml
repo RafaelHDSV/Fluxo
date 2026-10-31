@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://fluxo-vieira.vercel.app/login</loc>
+    <loc>https://fluxo.getvieira.com/login</loc>
     <changefreq>monthly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://fluxo-vieira.vercel.app/register</loc>
+    <loc>https://fluxo.getvieira.com/register</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://fluxo-vieira.vercel.app/privacidade</loc>
+    <loc>https://fluxo.getvieira.com/privacidade</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://fluxo-vieira.vercel.app/termos</loc>
+    <loc>https://fluxo.getvieira.com/termos</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>

@@ -14,4 +14,4 @@ Disallow: /investments
 Disallow: /reports
 Disallow: /api/
 
-Sitemap: https://fluxo-vieira.vercel.app/sitemap.xml
+Sitemap: https://fluxo.getvieira.com/sitemap.xml
