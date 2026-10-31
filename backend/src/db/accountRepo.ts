@@ -69,5 +69,9 @@ export function accountRepo(userId: string) {
       await query('DELETE FROM fluxo_profiles WHERE id = $1', [userId])
       return { authUserDeleted: Boolean(row?.result?.auth_user_deleted) }
     },
+
+    async ensureWorkspace(email?: string): Promise<void> {
+      await query('select public.fluxo_ensure_user($1::uuid, $2::text)', [userId, email ?? null])
+    },
   }
 }

@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
+import { accountRepo } from '../db/accountRepo.js'
 import { SUPABASE_JWT_SECRET, SUPABASE_URL } from '../globals/Config.js'
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | null = null
@@ -48,6 +49,12 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     req.userId = payload.sub
     req.accessToken = token
     req.email = typeof payload.email === 'string' ? payload.email : undefined
+    try {
+      await accountRepo(payload.sub).ensureWorkspace(req.email)
+    } catch (error) {
+      next(error)
+      return
+    }
     return next()
   } catch {
     return res.status(401).json({ error: 'Token inválido ou expirado' })
