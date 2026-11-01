@@ -13,7 +13,8 @@ import {
   MoreHorizontal,
   UserRound,
 } from 'lucide-react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Seo } from '@vieira/institucional'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { type ReactNode, useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -80,8 +81,14 @@ export function Layout({ children }: { children?: ReactNode } = {}) {
       .catch(() => setUnpaidCount(0))
   }, [])
 
+  const { pathname } = useLocation()
+  const pageTitle = links.find((link) =>
+    link.to === '/' ? pathname === '/' : pathname.startsWith(link.to),
+  )?.label ?? 'Fluxo'
+
   return (
     <div className="flex min-h-screen bg-background text-foreground">
+      <Seo title={pageTitle} noindex />
       <aside className="sticky top-0 hidden h-screen w-[260px] shrink-0 flex-col gap-6 overflow-y-auto border-r border-border bg-surface p-5 lg:flex">
         <div className="flex items-center gap-3">
           <img src="/logo.svg" alt="Fluxo" width={40} height={40} className="rounded-xl" />

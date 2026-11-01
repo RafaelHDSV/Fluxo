@@ -1,10 +1,11 @@
-import { SiteFooter } from '@vieira/institucional'
+import { Seo, SiteFooter } from '@vieira/institucional'
 import { AuthPresentation } from '@/components/auth/AuthPresentation'
 import { authPresentation } from '@/config/authPresentation'
 import { useTheme } from '@/hooks/useTheme'
 import { cn } from '@/lib/utils'
 import { Moon, Sun } from 'lucide-react'
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 
 type AuthShellProps = {
   children: ReactNode
@@ -78,12 +79,18 @@ function AuthFormScroll({ children }: { children: ReactNode }) {
  * Login stays vertically centered (`my-auto`). Signup can grow: the column
  * scrolls from the top (not from a centered clip).
  */
+function AuthRouteSeo() {
+  const { pathname } = useLocation()
+  return <Seo title={pathname === '/register' ? 'Criar conta' : 'Entrar'} />
+}
+
 export function AuthShell({ children }: AuthShellProps) {
   const cfg = authPresentation
   const { theme, toggleTheme } = useTheme()
 
   return (
     <div className="flex h-dvh max-h-dvh w-full max-w-[100vw] overflow-hidden bg-background">
+      <AuthRouteSeo />
       <aside className="relative flex h-full min-h-0 w-full flex-col py-6 lg:w-[38%] lg:py-8">
         <div className="flex w-full shrink-0 items-center justify-between gap-4 px-6 sm:px-10 lg:px-10">
           <div className="flex items-center gap-2.5">
