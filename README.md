@@ -1,4 +1,4 @@
-# Fluxo
+﻿# Fluxo
 
 <p align="center">
   <strong>Veja seu dinheiro com clareza.</strong><br/>
@@ -273,3 +273,7 @@ Se o Fluxo te ajudou a organizar as finanças ou serviu de base para outro traba
 <a href="https://www.buymeacoffee.com/vieira" target="_blank" rel="noopener noreferrer">
   <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="48" width="174" />
 </a>
+
+---
+
+Comunidade: [CHANGELOG](CHANGELOG.md) · [CONTRIBUTING](CONTRIBUTING.md) · [CODE_OF_CONDUCT](CODE_OF_CONDUCT.md)
