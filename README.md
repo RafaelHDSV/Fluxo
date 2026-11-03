@@ -64,6 +64,18 @@ Autenticação Supabase, dados isolados por usuário (RLS), moeda **BRL**.
 
 ---
 
+## Como funciona
+
+```text
+SPA React  →  BFF Express (Vercel /api)  →  Supabase (fluxo_* + Auth + RLS)
+                      ↓
+            saldo da conta = âncora; lançamento pago move o caixa
+```
+
+Produção: [https://fluxo.getvieira.com](https://fluxo.getvieira.com). Living docs: [`docs/context.md`](docs/context.md).
+
+---
+
 ## 🎯 Por que assim
 
 - ⚓ **Saldo das contas** é a âncora (editável; lançamento pago move o saldo)
