@@ -4,7 +4,6 @@ ofx
 ofx/*
 
 # Docs e scripts locais / pessoais (não versionar)
-docs/
 backend/scripts/
 
 # Notion one-shot dump (PII / histórico pessoal)
