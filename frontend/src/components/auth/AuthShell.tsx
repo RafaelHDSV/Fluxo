@@ -1,3 +1,4 @@
+import { VisitCountFooter } from '@vieira/analytics/react'
 import { Seo, SiteFooter } from '@vieira/institucional'
 import { AuthPresentation } from '@/components/auth/AuthPresentation'
 import { authPresentation } from '@/config/authPresentation'
@@ -117,7 +118,10 @@ export function AuthShell({ children }: AuthShellProps) {
 
         <div className="relative z-10 shrink-0 bg-background px-6 pt-3 sm:px-10 lg:px-10">
           <p className="text-center text-xs text-muted-foreground lg:hidden">{cfg.tagline}</p>
-          <SiteFooter className="border-0 px-0 py-0 text-xs" />
+          <SiteFooter
+            className="border-0 px-0 py-0 text-xs"
+            visitCount={<VisitCountFooter projectKey="fluxo" />}
+          />
         </div>
       </aside>
 
